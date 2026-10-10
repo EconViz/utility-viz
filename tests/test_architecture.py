@@ -253,6 +253,32 @@ def test_models_curves_import_no_matplotlib():
 
 PURE_DATA_UNITS = ("core.styles", "core.themes")
 
+# Migration debt ceiling.  Removing entries is always allowed; adding a new direct
+# Matplotlib dependency is not.  Task 5 replaces this allowlist with ``assert not
+# offenders`` once the last legacy drawing path has moved to MosaicKit.
+LEGACY_MATPLOTLIB_MODULES = {
+    "core.animation.animator",
+    "core.canvas.base",
+    "core.canvas.decomposition",
+    "core.canvas.legend",
+    "core.canvas.renderers.path",
+    "core.canvas.style",
+    "core.diagrams.components._corners",
+    "core.diagrams.components.indifference",
+    "core.diagrams.consumer.demand",
+    "core.diagrams.consumer.edgeworth.base",
+    "core.diagrams.consumer.edgeworth.box",
+    "core.export.backend_tikz",
+    "core.export.backend_tikz._path",
+    "core.export.backend_tikz.renderer",
+    "core.export.exporter",
+    "core.layout.figure",
+    "core.interactive.widgets",
+    "core.rendering.fonts",
+    "core.rendering.stroke",
+    "core.rendering.style_checks",
+}
+
 
 def _third_party_roots(path: Path) -> set[str]:
     roots: set[str] = set()
@@ -262,6 +288,11 @@ def _third_party_roots(path: Path) -> set[str]:
         elif isinstance(node, ast.Import):
             roots.update(a.name.split(".")[0] for a in node.names)
     return roots
+
+
+def test_no_new_direct_matplotlib_dependencies_during_migration():
+    offenders = {module for module, path in _modules() if "matplotlib" in _third_party_roots(path)}
+    assert offenders <= LEGACY_MATPLOTLIB_MODULES, sorted(offenders - LEGACY_MATPLOTLIB_MODULES)
 
 
 def test_styles_and_themes_are_pure_data_without_matplotlib():
