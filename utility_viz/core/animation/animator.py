@@ -1,17 +1,15 @@
-"""Core Animator class for GIF export via the factory pattern."""
+"""GIF export from utility-viz Canvas/Figure scene factories."""
 
 from __future__ import annotations
 
-import io
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-from utility_viz.core.constants.io import SAVEFIG_BBOX_INCHES
-
-if TYPE_CHECKING:  # pragma: no cover
+if TYPE_CHECKING:
     from utility_viz.core.canvas.base import Canvas
     from utility_viz.core.layout.figure import Figure
 
@@ -19,7 +17,6 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 def _require_pillow() -> None:
-    """Raise a clear ImportError if Pillow is not installed."""
     try:
         import PIL  # noqa: F401
     except ImportError as exc:
@@ -30,60 +27,25 @@ def _require_pillow() -> None:
         ) from exc
 
 
-def _figure_to_pil(fig, dpi: int):
-    """Render a matplotlib Figure to a PIL RGB Image suitable for GIF export.
-
-    Transparent Canvas backgrounds are composited onto white so that GIF
-    frames never bleed through to preceding frames.
-    """
+def _saved_scene_to_pil(drawable, target: Path, dpi: int):
+    """Render through the drawable's MosaicKit save path and load an RGB frame."""
     from PIL import Image
 
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, bbox_inches=SAVEFIG_BBOX_INCHES)
-    buf.seek(0)
-    rgba = Image.open(buf).copy().convert("RGBA")
-    # Composite onto a solid white background; GIF only supports 1-bit
-    # transparency, so blending here avoids artefacts in animated viewers.
-    background = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
-    background.paste(rgba, mask=rgba.split()[3])
-    return background.convert("RGB")
+    canvases = getattr(drawable, "canvases", (drawable,))
+    previous = []
+    for canvas in canvases:
+        previous.append(canvas.spec)
+        canvas.spec = canvas.spec.replace(dpi=dpi)
+    try:
+        drawable.save(target, transparent=False)
+        return Image.open(target).copy().convert("RGB")
+    finally:
+        for canvas, spec in zip(canvases, previous, strict=True):
+            canvas.spec = spec
 
 
 class Animator:
-    """Generate a GIF animation by sweeping a parameter across a range.
-
-    This class follows the **factory pattern**: for each frame value the
-    caller-supplied *figure_factory* creates a fresh :class:`~utility_viz.core.canvas.base.Canvas`
-    (or :class:`~utility_viz.core.layout.figure.Figure`).  The Animator renders
-    every frame to an in-memory image and stitches them into a GIF using
-    Pillow — no ffmpeg required.
-
-    Parameters
-    ----------
-    figure_factory : Callable[[float], Canvas | Figure]
-        A function that accepts a single numeric frame value and returns a
-        fully populated Canvas or Figure.  Write this exactly as you would
-        write a normal utility_viz plotting script; the Animator handles
-        opening and closing matplotlib figures automatically.
-    frames : array-like of float
-        Ordered sequence of parameter values — one element per animation
-        frame (e.g. ``np.linspace(1.0, 10.0, 50)``).
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> from utility_viz import Canvas
-    >>> from utility_viz.models.utility import CobbDouglas
-    >>> from utility_viz.core.animation import Animator
-    >>>
-    >>> def draw(p1: float) -> Canvas:
-    ...     c = Canvas(x_max=10, y_max=10, x_label="X_1", y_label="X_2")
-    ...     c.add_budget(px=p1, py=2.0, income=20.0)
-    ...     c.add_utility(CobbDouglas(0.5, 0.5), levels=5)
-    ...     return c
-    >>>
-    >>> Animator(draw, frames=np.linspace(1, 8, 40)).save("budget_sweep.gif", fps=12)
-    """
+    """Generate a GIF by rendering each factory result through MosaicKit."""
 
     def __init__(
         self,
@@ -91,13 +53,9 @@ class Animator:
         frames: Sequence[float] | np.ndarray,
     ) -> None:
         self._factory = figure_factory
-        self._frames: np.ndarray = np.asarray(frames, dtype=float)
+        self._frames = np.asarray(frames, dtype=float)
         if self._frames.ndim != 1 or len(self._frames) == 0:
             raise ValueError("`frames` must be a non-empty 1-D array-like.")
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
 
     def save(
         self,
@@ -106,52 +64,21 @@ class Animator:
         dpi: int = 150,
         loop: int = 0,
     ) -> None:
-        """Render all frames and write the result to *path* as a GIF.
-
-        Parameters
-        ----------
-        path : str or Path
-            Destination file path, e.g. ``"price_sweep.gif"``.
-        fps : int
-            Frames per second.  Default ``10``.
-        dpi : int
-            Dots-per-inch used when rasterising each frame.  Lower values
-            produce smaller files; ``150`` is a good balance for web use.
-            Default ``150``.
-        loop : int
-            Number of GIF loops.  ``0`` means loop forever (default).
-        """
         _require_pillow()
-        import matplotlib
-        import matplotlib.pyplot as plt
-
-        matplotlib.use("Agg")
-
-        images = self._render_frames(dpi=dpi, plt=plt)
+        images = self._render_frames(dpi=dpi)
         self._write_gif(images, path=Path(path), fps=fps, loop=loop)
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-
-    def _render_frames(self, dpi: int, plt) -> list:
-        """Call the factory for every frame value and collect PIL images."""
+    def _render_frames(self, dpi: int) -> list:
         images = []
-        for val in self._frames:
-            canvas_or_fig = self._factory(float(val))
-            mpl_fig = canvas_or_fig.fig
-            images.append(_figure_to_pil(mpl_fig, dpi=dpi))
-            plt.close(mpl_fig)
+        with TemporaryDirectory(prefix="utility-viz-animation-") as directory:
+            root = Path(directory)
+            for index, value in enumerate(self._frames):
+                drawable = self._factory(float(value))
+                images.append(_saved_scene_to_pil(drawable, root / f"frame-{index:06d}.png", dpi))
         return images
 
     @staticmethod
-    def _write_gif(
-        images: list,
-        path: Path,
-        fps: int,
-        loop: int,
-    ) -> None:
-        """Stitch PIL images into a GIF file using Pillow."""
+    def _write_gif(images: list, path: Path, fps: int, loop: int) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         duration_ms = int(1000 / max(fps, 1))
         images[0].save(
@@ -161,5 +88,5 @@ class Animator:
             loop=loop,
             duration=duration_ms,
             optimize=False,
-            disposal=2,  # restore to background between frames; prevents stacking
+            disposal=2,
         )

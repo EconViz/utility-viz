@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -99,8 +101,7 @@ class WidgetViewer:
         _require_widgets()
 
         import ipywidgets as widgets
-        import matplotlib.pyplot as plt
-        from IPython.display import clear_output, display
+        from IPython.display import Image, clear_output, display
 
         sliders = self._build_sliders(widgets)
         value_inputs = self._build_value_inputs(widgets, sliders)
@@ -110,9 +111,9 @@ class WidgetViewer:
         self._redraw(
             out=out,
             values={name: s.value for name, s in sliders.items()},
-            plt=plt,
             clear_output=clear_output,
             display=display,
+            image_type=Image,
         )
 
         # Wire each slider to the redraw callback.
@@ -120,9 +121,9 @@ class WidgetViewer:
             self._redraw(
                 out=out,
                 values={name: s.value for name, s in sliders.items()},
-                plt=plt,
                 clear_output=clear_output,
                 display=display,
+                image_type=Image,
             )
 
         for slider in sliders.values():
@@ -200,13 +201,15 @@ class WidgetViewer:
         self,
         out,
         values: dict[str, float],
-        plt,
         clear_output: Callable,
         display: Callable,
+        image_type: type,
     ) -> None:
         """Clear the output widget and render a fresh diagram."""
         with out:
             clear_output(wait=True)
             canvas_or_fig = self._draw_func(**values)
-            display(canvas_or_fig.fig)
-            plt.close(canvas_or_fig.fig)
+            with TemporaryDirectory(prefix="utility-viz-widget-") as directory:
+                target = Path(directory) / "frame.png"
+                canvas_or_fig.save(target, transparent=False)
+                display(image_type(data=target.read_bytes(), format="png"))

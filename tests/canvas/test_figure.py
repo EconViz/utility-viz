@@ -2,6 +2,7 @@
 
 import numpy as np
 import pytest
+from mosaickit import FillLayer, MarkerLayer, PathLayer
 
 from utility_viz import (
     ArrowStyle,
@@ -56,14 +57,16 @@ class TestFigure:
         fig[0].add_utility(CobbDouglas(), levels=3)
         fig[0].add_budget(px=2.0, py=3.0, income=30.0, fill=True)
         fig[1].add_point(2.0, 3.0, label="A")
-        assert len(fig[0].ax.collections) >= 1
-        assert len(fig[0].ax.lines) >= 1
-        assert len(fig[1].ax.lines) >= 1
+        assert any(isinstance(layer, FillLayer) for layer in fig[0].snapshot().layers)
+        assert any(isinstance(layer, PathLayer) for layer in fig[0].snapshot().layers)
+        assert any(isinstance(layer, MarkerLayer) for layer in fig[1].snapshot().layers)
 
-    def test_shared_axes_link_matplotlib_axes(self):
+    def test_shared_axes_share_ranges_and_hide_duplicate_labels(self):
         fig = Figure(Layout.SIDE_BY_SIDE, shared_x=True, shared_y=True)
-        assert fig[0].ax.get_shared_x_axes().joined(fig[0].ax, fig[1].ax)
-        assert fig[0].ax.get_shared_y_axes().joined(fig[0].ax, fig[1].ax)
+        assert fig[0].spec.x_range == fig[1].spec.x_range
+        assert fig[0].spec.y_range == fig[1].spec.y_range
+        assert "axes.y.label" in {layer.id for layer in fig[0].snapshot().layers}
+        assert "axes.y.label" not in {layer.id for layer in fig[1].snapshot().layers}
 
     def test_axis_customization_is_forwarded_to_every_panel(self):
         fig = Figure(
