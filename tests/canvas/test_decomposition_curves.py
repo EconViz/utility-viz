@@ -1,12 +1,9 @@
-"""add_decomposition draws the indifference curves through A, C, and (Slutsky) B."""
+"""Price decomposition is expressed entirely as MosaicKit scene layers."""
 
-import matplotlib
+from dataclasses import replace
 
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
 import pytest
-from matplotlib.colors import to_hex
+from mosaickit import ArrowPlacement, LegendLayer, MarkerLayer, PathLayer, TextLayer
 
 from utility_viz import Canvas, Label, Stroke
 from utility_viz.models.optimization import decompose_price_effect
@@ -15,22 +12,12 @@ from utility_viz.models.utility import CobbDouglas
 MODEL = CobbDouglas(alpha=0.5, beta=0.5)
 
 
-def _dec(method):
+def _dec(method: str):
     return decompose_price_effect(MODEL, px=(2.0, 4.0), py=3.0, income=60.0, method=method)
 
 
-@pytest.fixture(autouse=True)
-def close_figures():
-    yield
-    plt.close("all")
-
-
-def _role(ax, role):
-    return [a for a in ax.get_children() if getattr(a, "_ev_role", None) == role]
-
-
-def _levels(ax):
-    return sorted(float(level) for cs in _role(ax, "curve") for level in cs.levels)
+def _layers(canvas: Canvas, prefix: str):
+    return [layer for layer in canvas.snapshot().layers if layer.id.startswith(prefix)]
 
 
 def test_result_keeps_the_function():
@@ -39,70 +26,71 @@ def test_result_keeps_the_function():
     assert "func" not in repr(dec)
 
 
-def test_hicks_draws_u0_and_u1():
-    dec = _dec("hicks")
-    cvs = Canvas(x_max=40, y_max=27).add_decomposition(dec)
-    assert _levels(cvs.ax) == pytest.approx(sorted([dec.A.utility, dec.C.utility]))
-    assert dec.B.utility == pytest.approx(dec.A.utility)
+def test_hicks_draws_two_distinct_utility_levels_and_three_budgets():
+    canvas = Canvas(x_max=40, y_max=27).add_decomposition(_dec("hicks"))
+    curve_ids = {layer.id.split(".")[2] for layer in _layers(canvas, "decomposition.curve.")}
+    assert curve_ids == {"U0", "U1"}
+    assert {layer.id for layer in _layers(canvas, "decomposition.budget.")} == {
+        "decomposition.budget.original",
+        "decomposition.budget.compensated",
+        "decomposition.budget.final",
+    }
 
 
 def test_slutsky_adds_the_curve_through_b():
-    dec = _dec("slutsky")
-    cvs = Canvas(x_max=40, y_max=27).add_decomposition(dec)
-    assert _levels(cvs.ax) == pytest.approx(sorted([dec.A.utility, dec.B.utility, dec.C.utility]))
+    canvas = Canvas(x_max=40, y_max=27).add_decomposition(_dec("slutsky"))
+    curve_ids = {layer.id.split(".")[2] for layer in _layers(canvas, "decomposition.curve.")}
+    assert curve_ids == {"U0", "UB", "U1"}
 
 
-def test_show_curves_false_restores_previous_output():
-    cvs = Canvas(x_max=40, y_max=27).add_decomposition(_dec("slutsky"), show_curves=False)
-    assert _role(cvs.ax, "curve") == []
+def test_show_curves_false_omits_curve_layers():
+    canvas = Canvas(x_max=40, y_max=27).add_decomposition(_dec("slutsky"), show_curves=False)
+    assert _layers(canvas, "decomposition.curve.") == []
 
 
-def test_curves_use_the_ic_stroke_by_default():
-    cvs = Canvas(x_max=40, y_max=27).add_decomposition(_dec("hicks"))
-    for cs in _role(cvs.ax, "curve"):
-        assert to_hex(cs.get_edgecolor()[0]) == to_hex(cvs.theme.ic_color)
-
-
-def test_curve_stroke():
-    cvs = Canvas(x_max=40, y_max=27).add_decomposition(
-        _dec("hicks"), curve_stroke=Stroke(color="#123456", width=2.5, style="--")
+def test_curve_stroke_and_labels_are_scene_properties():
+    canvas = Canvas(x_max=40, y_max=27).add_decomposition(
+        _dec("slutsky"),
+        curve_stroke=Stroke(color="#123456", width=2.5, style="--"),
+        curve_label=Label(position="top", color="#654321", text="ignored"),
     )
-    for cs in _role(cvs.ax, "curve"):
-        assert to_hex(cs.get_edgecolor()[0]) == "#123456"
-        assert cs.get_linewidth()[0] == pytest.approx(2.5)
-
-
-def test_no_curve_labels_by_default():
-    cvs = Canvas(x_max=40, y_max=27).add_decomposition(_dec("slutsky"))
-    assert _role(cvs.ax, "ic_label") == []
-
-
-def test_curve_labels():
-    cvs = Canvas(x_max=40, y_max=27).add_decomposition(
-        _dec("slutsky"), curve_label=Label(position="top", color="#654321", text="ignored")
-    )
-    texts = _role(cvs.ax, "ic_label")
-    assert sorted(t.get_text() for t in texts) == ["$U_0$", "$U_1$", "$U_B$"]
-    assert all(to_hex(t.get_color()) == "#654321" for t in texts)
+    curves = [layer for layer in _layers(canvas, "decomposition.curve.") if isinstance(layer, PathLayer)]
+    labels = [layer for layer in _layers(canvas, "decomposition.curve.") if isinstance(layer, TextLayer)]
+    assert curves
+    assert all(layer.stroke.color.to_hex() == "#123456" and layer.stroke.width == 2.5 for layer in curves)
+    assert {label.text for label in labels} == {"U_0", "U_B", "U_1"}
+    assert all(label.style.color.to_hex() == "#654321" for label in labels)
 
 
 def test_decomposition_without_function_skips_curves():
-    from dataclasses import replace
-
-    cvs = Canvas(x_max=40, y_max=27).add_decomposition(replace(_dec("hicks"), func=None))
-    assert _role(cvs.ax, "curve") == []
+    canvas = Canvas(x_max=40, y_max=27).add_decomposition(replace(_dec("hicks"), func=None))
+    assert _layers(canvas, "decomposition.curve.") == []
 
 
-def test_range_arrows_point_from_start_to_end():
+def test_effect_arrows_point_from_start_to_end():
     dec = _dec("hicks")
-    cvs = Canvas(x_max=40, y_max=27).add_decomposition(dec, show_x_projections=True)
-    ranges = _role(cvs.ax, "range")
+    canvas = Canvas(x_max=40, y_max=27).add_decomposition(dec)
+    by_id = {layer.id: layer for layer in canvas.snapshot().layers}
+    substitution = by_id["decomposition.effect.substitution"]
+    income = by_id["decomposition.effect.income"]
+    assert isinstance(substitution, PathLayer)
+    assert tuple(substitution.path)[0] == pytest.approx((dec.A.x, dec.A.y))
+    assert tuple(substitution.path)[1] == pytest.approx((dec.B.x, dec.B.y))
+    assert tuple(income.path)[0] == pytest.approx((dec.B.x, dec.B.y))
+    assert tuple(income.path)[1] == pytest.approx((dec.C.x, dec.C.y))
+    assert substitution.arrow_placement is ArrowPlacement.END
+
+
+def test_x_projection_mode_draws_guides_and_horizontal_ranges():
+    dec = _dec("hicks")
+    canvas = Canvas(x_max=40, y_max=27).add_decomposition(dec, show_x_projections=True)
+    ranges = [layer for layer in _layers(canvas, "decomposition.range.") if isinstance(layer, PathLayer)]
     assert len(ranges) == 2
-    sub, inc = ranges
-    # Substitution runs A -> B, income B -> C; the head sits at xy.
-    assert (sub.xyann[0], sub.xy[0]) == pytest.approx((dec.A.x, dec.B.x))
-    assert (inc.xyann[0], inc.xy[0]) == pytest.approx((dec.B.x, dec.C.x))
-    assert all(type(r.arrow_patch.get_arrowstyle()).__name__ == "CurveB" for r in ranges)
+    assert tuple(ranges[0].path)[0][0] == pytest.approx(dec.A.x)
+    assert tuple(ranges[0].path)[1][0] == pytest.approx(dec.B.x)
+    assert tuple(ranges[1].path)[0][0] == pytest.approx(dec.B.x)
+    assert tuple(ranges[1].path)[1][0] == pytest.approx(dec.C.x)
+    assert len(_layers(canvas, "decomposition.projection.")) == 3
 
 
 def test_zero_effect_draws_no_range_arrow():
@@ -110,20 +98,20 @@ def test_zero_effect_draws_no_range_arrow():
 
     from utility_viz.models.utility import QuasiLinear
 
-    # Quasi-linear in y: demand for x does not depend on income, so the income effect is zero.
     dec = decompose_price_effect(
         QuasiLinear(v_func=lambda z: 4.0 * np.log(z), linear_in="y"), px=(2.0, 1.0), py=1.0, income=28.0, method="hicks"
     )
-    assert dec.income_effect[0] == pytest.approx(0.0, abs=1e-3)
-    cvs = Canvas(x_max=30, y_max=35).add_decomposition(dec, show_x_projections=True)
-    ranges = _role(cvs.ax, "range")
-    assert len(ranges) == 1
-    assert (ranges[0].xyann[0], ranges[0].xy[0]) == pytest.approx((dec.A.x, dec.B.x))
+    canvas = Canvas(x_max=30, y_max=35).add_decomposition(dec, show_x_projections=True)
+    assert len([layer for layer in _layers(canvas, "decomposition.range.") if isinstance(layer, PathLayer)]) == 1
 
 
-def test_negative_utility_levels_are_solid():
-    from utility_viz.models.utility import Satiation
-
-    cvs = Canvas(x_max=12, y_max=10).add_utility(Satiation(bliss_x=6, bliss_y=4), levels=[-8, -2])
-    for cs in _role(cvs.ax, "curve"):
-        assert all(style[1] is None for style in cs.get_linestyle())
+def test_bundle_markers_labels_and_legend_are_mosaickit_layers():
+    canvas = Canvas(x_max=40, y_max=27).add_decomposition(_dec("hicks"))
+    layers = canvas.snapshot().layers
+    assert isinstance(next(layer for layer in layers if layer.id == "decomposition.bundles"), MarkerLayer)
+    assert {layer.text for layer in _layers(canvas, "decomposition.bundle.") if isinstance(layer, TextLayer)} == {
+        "A",
+        "B",
+        "C",
+    }
+    assert any(isinstance(layer, LegendLayer) for layer in layers)

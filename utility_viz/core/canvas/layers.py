@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING, Any
 
 from mosaickit import LegendLayer, LegendStyle, MarkerLayer, PathLayer, TextLayer
 
-from utility_viz.core.scenes import budget_layers, equilibrium_layers, indifference_layers
+from utility_viz.core.scenes import budget_layers, decomposition_layers, equilibrium_layers, indifference_layers
+from utility_viz.core.scenes.path import smooth_path
 from utility_viz.core.scenes.styles import (
     to_mosaic_fill,
     to_mosaic_marker,
@@ -26,6 +27,15 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
 
+_LEGEND_LOCATIONS = {
+    "auto": "best",
+    "top": "upper center",
+    "bottom": "lower center",
+    "left": "center left",
+    "right": "center right",
+}
+
+
 class LayerMixin:
     legacy_theme: Any
     font: str | None
@@ -34,6 +44,154 @@ class LayerMixin:
     add: Any
     extend: Any
     _next_id: Any
+
+    def add_decomposition(
+        self,
+        decomposition,
+        *,
+        show_arrows: bool = True,
+        label_effects: bool = True,
+        show_x_projections: bool = False,
+        point_color: str | None = None,
+        point_markersize: float | None = None,
+        original_budget_color: str | None = None,
+        original_budget_linewidth: float | None = None,
+        original_budget_linestyle: str | None = None,
+        compensated_budget_color: str | None = None,
+        compensated_budget_linewidth: float | None = None,
+        compensated_budget_linestyle: str | None = None,
+        final_budget_color: str | None = None,
+        final_budget_linewidth: float | None = None,
+        final_budget_linestyle: str | None = None,
+        substitution_color: str | None = None,
+        income_color: str | None = None,
+        effect_arrow_linewidth: float | None = None,
+        original_budget_stroke: Stroke | None = None,
+        compensated_budget_stroke: Stroke | None = None,
+        final_budget_stroke: Stroke | None = None,
+        substitution_stroke: Stroke | None = None,
+        income_stroke: Stroke | None = None,
+        projection_stroke: Stroke | None = None,
+        guide_stroke: Stroke | None = None,
+        range_stroke: Stroke | None = None,
+        substitution=None,
+        income=None,
+        point_marker: Marker | None = None,
+        point_label: Label | None = None,
+        show_curves: bool = True,
+        curve_stroke: Stroke | None = None,
+        curve_label: Label | None = None,
+        legend: Legend | None = None,
+    ) -> Self:
+        """Add a Hicks/Slutsky decomposition as backend-neutral layers."""
+        theme = self.legacy_theme
+        budget_specs = (
+            (
+                original_budget_stroke,
+                theme.budget_stroke,
+                original_budget_color,
+                original_budget_linewidth,
+                original_budget_linestyle,
+            ),
+            (
+                compensated_budget_stroke,
+                theme.compensated_budget_stroke,
+                compensated_budget_color,
+                compensated_budget_linewidth,
+                compensated_budget_linestyle,
+            ),
+            (
+                final_budget_stroke,
+                theme.final_budget_stroke,
+                final_budget_color,
+                final_budget_linewidth,
+                final_budget_linestyle,
+            ),
+        )
+        budgets = []
+        for explicit, fallback, color, width, style in budget_specs:
+            selected = (explicit or Stroke()).merged_over(fallback)
+            selected = Stroke(color=color, width=width, style=LineStyle(style) if style else None).merged_over(selected)
+            budgets.append(to_mosaic_stroke(selected))
+
+        marker = (point_marker or Marker()).merged_over(theme.eq_marker)
+        marker = Marker(color=point_color, size=point_markersize).merged_over(marker)
+        _, bundle_label = split_label(point_label, theme.bundle_label)
+        sub = (substitution_stroke or Stroke()).merged_over(theme.substitution_stroke)
+        inc = (income_stroke or Stroke()).merged_over(theme.income_stroke)
+        sub = Stroke(
+            color=getattr(substitution, "color", None) or substitution_color,
+            width=effect_arrow_linewidth,
+            opacity=getattr(substitution, "opacity", None),
+            arrow="->",
+        ).merged_over(sub)
+        inc = Stroke(
+            color=getattr(income, "color", None) or income_color,
+            width=effect_arrow_linewidth,
+            opacity=getattr(income, "opacity", None),
+            arrow="->",
+        ).merged_over(inc)
+
+        self.extend(
+            decomposition_layers(
+                decomposition,
+                y_max=self.y_max,
+                budget_strokes=budgets,
+                bundle_marker=to_mosaic_marker(marker),
+                bundle_text=to_mosaic_text(bundle_label, family=self.font),
+                substitution_stroke=to_mosaic_stroke(sub),
+                income_stroke=to_mosaic_stroke(inc),
+                effect_text=to_mosaic_text(theme.effect_label, family=self.font),
+                show_arrows=show_arrows,
+                show_x_projections=show_x_projections,
+                label_effects=label_effects,
+            )
+        )
+
+        if show_curves and decomposition.func is not None:
+            selected = (curve_stroke or Stroke()).merged_over(theme.ic_stroke)
+            levels: list[tuple[str, float]] = [
+                ("U0", float(decomposition.A.utility)),
+                ("U1", float(decomposition.C.utility)),
+            ]
+            if not math.isclose(decomposition.B.utility, decomposition.A.utility, rel_tol=1e-9, abs_tol=1e-12):
+                levels.insert(1, ("UB", float(decomposition.B.utility)))
+            names = {"U0": "U_0", "UB": "U_B", "U1": "U_1"}
+            for key, level in levels:
+                layers, _ = indifference_layers(
+                    decomposition.func,
+                    [level],
+                    self.x_max,
+                    self.y_max,
+                    layer_id=f"decomposition.curve.{key}",
+                    show_labels=curve_label is not None,
+                    label_fmt=names[key],
+                    stroke=to_mosaic_stroke(selected),
+                    z_index=1,
+                )
+                if curve_label is not None:
+                    _, label_style = split_label(curve_label, theme.ic_label)
+                    layers = tuple(
+                        TextLayer(
+                            layer.position,
+                            layer.text,
+                            id=layer.id,
+                            role=layer.role,
+                            style=to_mosaic_text(label_style, family=self.font),
+                            offset=layer.offset,
+                            anchor=layer.anchor,
+                            math=True,
+                            z_index=layer.z_index,
+                        )
+                        if isinstance(layer, TextLayer)
+                        else layer
+                        for layer in layers
+                    )
+                self.extend(layers)
+        if label_effects:
+            self.show_legend(legend)
+        _ = (projection_stroke, guide_stroke, range_stroke)
+        return self
 
     def add_utility(
         self,
@@ -264,16 +422,18 @@ class LayerMixin:
             if invert_axes
             else tuple(zip(path.x_values, path.y_values, strict=True))
         )
+        use_smoothing = path.default_smooth_curve if smooth_curve is None else smooth_curve
+        rendered_points, bezier = smooth_path(points) if use_smoothing else (list(points), None)
         selected = (stroke or Stroke()).merged_over(self.legacy_theme.path_stroke)
         selected = Stroke(color=color, width=linewidth).merged_over(selected)
         self.add(
             PathLayer(
-                points,
+                rendered_points,
                 id=prefix,
                 role="utility.path",
                 stroke=to_mosaic_stroke(selected),
                 legend=label,
-                model=path,
+                model=bezier or path,
                 z_index=4,
             )
         )
@@ -315,7 +475,6 @@ class LayerMixin:
                     stroke=to_mosaic_stroke((curve_stroke or Stroke()).merged_over(self.legacy_theme.ic_stroke)),
                 )
                 self.extend(layers)
-        _ = smooth_curve
         return self
 
     def show_legend(self, legend: Legend | None = None, **kwargs) -> Self:
@@ -330,14 +489,18 @@ class LayerMixin:
                 id=self._next_id("legend"),
                 style=LegendStyle(
                     visible=selected.visible,
-                    location=(
-                        str(getattr(selected.position, "value", selected.position))
-                        if selected.position is not None
-                        else None
-                    ),
+                    location=_mosaic_legend_location(selected.position),
                     frame=selected.frame,
                     size=selected.fontsize,
                 ),
             )
         )
         return self
+
+
+def _mosaic_legend_location(position: Any) -> str | None:
+    """Translate utility-viz placement names to MosaicKit renderer locations."""
+    if position is None:
+        return None
+    value = str(getattr(position, "value", position))
+    return _LEGEND_LOCATIONS.get(value, value)

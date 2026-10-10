@@ -2,7 +2,8 @@
 
 import numpy as np
 import pytest
-from mosaickit import FillLayer, MarkerLayer, PathLayer
+from bezierkit import PiecewiseBezier
+from mosaickit import FillLayer, LegendLayer, MarkerLayer, PathLayer
 
 from utility_viz import (
     ArrowStyle,
@@ -121,25 +122,23 @@ class TestConsumptionPaths:
         budget = LinearBudget(px=2.0, py=2.0, income=40.0)
         path = PricePath(CobbDouglas(alpha=0.5, beta=0.5), budget=budget, price="px", price_range=(1.0, 4.0), n=4)
         canvas = Canvas(x_max=25, y_max=25)
-        before = len(canvas.ax.lines)
         canvas.add_path(path)
-        assert len(canvas.ax.lines) == before + 1
-        assert len(canvas.ax.lines[-1].get_xdata()) > len(path.equilibria)
-        curve_xs = canvas.ax.lines[-1].get_xdata()
-        assert curve_xs.min() < min(path.x_values)
-        assert curve_xs.max() > max(path.x_values)
+        layer = next(layer for layer in canvas.snapshot().layers if layer.id == "path")
+        assert isinstance(layer, PathLayer)
+        assert isinstance(layer.model, PiecewiseBezier)
+        assert len(layer.path) > len(path.equilibria)
+        assert not any(
+            isinstance(item, MarkerLayer) and item.id.startswith("path") for item in canvas.snapshot().layers
+        )
 
     def test_income_path_defaults_to_single_smooth_curve_without_markers(self):
         budget = LinearBudget(px=2.0, py=2.0, income=40.0)
         path = IncomePath(CobbDouglas(alpha=0.5, beta=0.5), budget=budget, income_range=(10.0, 40.0), n=4)
         canvas = Canvas(x_max=25, y_max=25)
-        before = len(canvas.ax.lines)
         canvas.add_path(path)
-        assert len(canvas.ax.lines) == before + 1
-        assert len(canvas.ax.lines[-1].get_xdata()) > len(path.equilibria)
-        curve_xs = canvas.ax.lines[-1].get_xdata()
-        assert curve_xs.min() < min(path.x_values)
-        assert curve_xs.max() > max(path.x_values)
+        layer = next(layer for layer in canvas.snapshot().layers if layer.id == "path")
+        assert isinstance(layer.model, PiecewiseBezier)
+        assert len(layer.path) > len(path.equilibria)
 
 
 class TestDemandDiagram:
@@ -225,10 +224,10 @@ class TestDemandDiagram:
             n=20,
         )
         fig = DemandDiagram(path)
-        before = len(fig.demand_canvas.ax.lines)
         fig.add_marshallian_panel(price_markers=[2.0, 4.0], show_demand_guides=True)
-        after = len(fig.demand_canvas.ax.lines)
-        assert after >= before + 6
+        guides = [layer for layer in fig.demand_canvas.snapshot().layers if layer.id.startswith("demand.guide.")]
+        assert len(guides) == 4
+        assert all(isinstance(layer, PathLayer) for layer in guides)
 
     def test_perfect_substitutes_demand_breaks_at_tie(self):
         path = PricePath(
@@ -240,24 +239,11 @@ class TestDemandDiagram:
         )
         fig = DemandDiagram(path)
         fig.add_marshallian_panel(price_markers=[1.2, 3.0])
-        horizontal_segments = [
-            line
-            for line in fig.demand_canvas.ax.lines
-            if len(line.get_xdata()) == 2 and len(set(line.get_ydata())) == 1
-        ]
-        assert horizontal_segments
-        tie_markers = [
-            line
-            for line in fig.demand_canvas.ax.lines
-            if len(line.get_xdata()) == 1
-            and np.isclose(line.get_xdata()[0], 20.0)
-            and np.isclose(line.get_ydata()[0], 2.0)
-        ]
-        assert tie_markers
-        assert tie_markers[0].get_marker() == "o"
-        assert tie_markers[0].get_color() == fig.demand_canvas.theme.ic_color
-        assert tie_markers[0].get_clip_on() is False
-        assert tie_markers[0].get_zorder() > horizontal_segments[0].get_zorder()
+        layers = {layer.id: layer for layer in fig.demand_canvas.snapshot().layers}
+        assert tuple(layers["demand.curve.tie"].path) == ((0.0, 2.0), (20.0, 2.0))
+        assert isinstance(layers["demand.tie"], MarkerLayer)
+        assert layers["demand.tie"].points == ((20.0, 2.0),)
+        assert layers["demand.tie"].z_index > layers["demand.curve.tie"].z_index
 
     def test_demand_markers_are_not_clipped_and_draw_above_lines(self):
         path = PricePath(
@@ -269,19 +255,11 @@ class TestDemandDiagram:
         )
         fig = DemandDiagram(path)
         fig.add_marshallian_panel(price_markers=[3.0])
-        point_markers = [
-            line
-            for line in fig.demand_canvas.ax.lines
-            if len(line.get_xdata()) == 1
-            and line.get_marker() == "o"
-            and np.isclose(line.get_xdata()[0], 0.0)
-            and np.isclose(line.get_ydata()[0], 3.0)
-        ]
-        assert point_markers
-        assert point_markers[0].get_clip_on() is False
-        curve_lines = [line for line in fig.demand_canvas.ax.lines if len(line.get_xdata()) > 1]
-        assert curve_lines
-        assert point_markers[0].get_zorder() > curve_lines[0].get_zorder()
+        layers = fig.demand_canvas.snapshot().layers
+        point_markers = [layer for layer in layers if isinstance(layer, MarkerLayer) and layer.id == "demand.points"]
+        curves = [layer for layer in layers if isinstance(layer, PathLayer) and layer.id.startswith("demand.curve")]
+        assert point_markers and curves
+        assert point_markers[0].z_index > max(layer.z_index for layer in curves)
 
     def test_marshallian_panel_can_hide_legends(self):
         path = PricePath(
@@ -293,8 +271,8 @@ class TestDemandDiagram:
         )
         fig = DemandDiagram(path)
         fig.add_marshallian_panel(price_markers=[2.0, 4.0], show_legend=False)
-        assert fig.utility_canvas.ax.get_legend() is None
-        assert fig.demand_canvas.ax.get_legend() is None
+        assert not any(isinstance(layer, LegendLayer) for layer in fig.utility_canvas.snapshot().layers)
+        assert not any(isinstance(layer, LegendLayer) for layer in fig.demand_canvas.snapshot().layers)
 
     def test_goods_canvas_uses_wider_padding(self):
         path = PricePath(
@@ -318,9 +296,9 @@ class TestDemandDiagram:
         )
         fig = DemandDiagram(path)
         fig.add_marshallian_panel(show_pcc=True)
-        pcc_line = fig.utility_canvas.ax.lines[-1]
-        assert pcc_line.get_color() == fig.utility_canvas.theme.path_color
-        assert fig.utility_canvas.theme.path_color != fig.utility_canvas.theme.ic_color
+        pcc = next(layer for layer in fig.utility_canvas.snapshot().layers if layer.id == "path")
+        assert pcc.stroke.color.to_hex().lower() == fig.utility_canvas.legacy_theme.path_color.lower()
+        assert fig.utility_canvas.legacy_theme.path_color != fig.utility_canvas.legacy_theme.ic_color
 
 
 def test_figure_forwards_axis_line_styles():

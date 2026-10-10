@@ -8,6 +8,7 @@ mosaickit (``Canvas.save``) with :data:`UTILITY_THEME`, or export TikZ with
 """
 
 from utility_viz.core.scenes.budget import budget_layers
+from utility_viz.core.scenes.decomposition import decomposition_layers
 from utility_viz.core.scenes.equilibrium import equilibrium_layers
 from utility_viz.core.scenes.indifference import indifference_layers
 from utility_viz.core.scenes.roles import Budget, Equilibrium, Indifference
@@ -34,6 +35,7 @@ __all__ = [
     "Indifference",
     "UtilityColors",
     "budget_layers",
+    "decomposition_layers",
     "canvas_to_tikz",
     "equilibrium_layers",
     "indifference_layers",
