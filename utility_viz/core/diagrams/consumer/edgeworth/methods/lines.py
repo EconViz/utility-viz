@@ -41,12 +41,12 @@ class LinesMixin(BoxBase):
         if len(points) < 4 and method in {"auto", "pareto"}:
             points = self._contract_curve_pareto(n=n)
         self.contract_curve_points = points
-        selected = (stroke or Stroke()).merged_over(self.legacy_theme.contract_stroke)
         selected = Stroke(
             color=color,
             width=linewidth,
             style=LineStyle(linestyle) if linestyle else None,
-        ).merged_over(selected)
+        ).merged_over(self.legacy_theme.contract_stroke)
+        selected = (stroke or Stroke()).merged_over(selected)
         self.add(
             edgeworth_path_layer(
                 [tuple(point) for point in points],
@@ -69,8 +69,8 @@ class LinesMixin(BoxBase):
         marker: Marker | None = None,
     ) -> EdgeworthBox:
         self.core_points = self._unique_points(core_allocations(self._as_box(), tol))
-        selected = (stroke or Stroke()).merged_over(self.legacy_theme.core_stroke)
-        selected = Stroke(color=color, width=linewidth).merged_over(selected)
+        selected = Stroke(color=color, width=linewidth).merged_over(self.legacy_theme.core_stroke)
+        selected = (stroke or Stroke()).merged_over(selected)
         if len(self.core_points) >= min_points:
             self.add(
                 edgeworth_path_layer(
@@ -83,8 +83,8 @@ class LinesMixin(BoxBase):
                 )
             )
         elif len(self.core_points):
-            selected_marker = (marker or Marker()).merged_over(self.legacy_theme.core_marker)
-            selected_marker = Marker(color=color).merged_over(selected_marker)
+            selected_marker = Marker(color=color).merged_over(self.legacy_theme.core_marker)
+            selected_marker = (marker or Marker()).merged_over(selected_marker)
             self.add(
                 MarkerLayer(
                     tuple(tuple(point) for point in self.core_points),
@@ -113,12 +113,12 @@ class LinesMixin(BoxBase):
         if self.endowment is None:
             raise ValueError("Endowment is required. Call add_endowment(...) first.")
         ex, ey = self.endowment
-        selected = (stroke or Stroke()).merged_over(self.legacy_theme.price_stroke)
         selected = Stroke(
             color=color,
             width=linewidth,
             style=LineStyle(linestyle) if linestyle else None,
-        ).merged_over(selected)
+        ).merged_over(self.legacy_theme.price_stroke)
+        selected = (stroke or Stroke()).merged_over(selected)
         self.add(
             edgeworth_path_layer(
                 self._line_box_intersections(px, py, px * ex + py * ey),

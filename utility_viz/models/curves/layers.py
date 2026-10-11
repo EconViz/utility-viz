@@ -2,8 +2,7 @@
 Layer — numerical evaluation helpers for contour-based visualizations.
 
 The :class:`Layer` class provides static methods that convert a scalar
-utility function into the mesh-grid arrays required by matplotlib's
-contouring routines.
+utility function into mesh-grid arrays for numerical level-set operations.
 """
 
 from collections.abc import Callable
@@ -42,8 +41,7 @@ class Layer:
         Returns
         -------
         tuple[ndarray, ndarray, ndarray]
-            ``(X, Y, Z)`` mesh-grid arrays suitable for
-            :func:`matplotlib.pyplot.contour`.
+            ``(X, Y, Z)`` mesh-grid arrays suitable for level-set tracing.
         """
         x = np.linspace(x_range[0], x_range[1], res)
         y = np.linspace(y_range[0], y_range[1], res)

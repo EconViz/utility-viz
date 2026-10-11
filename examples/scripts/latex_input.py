@@ -6,10 +6,6 @@ PerfectSubstitutes), which is then used in the standard solve → draw
 workflow.
 """
 
-import matplotlib
-
-matplotlib.use("Agg")
-
 from pathlib import Path
 
 from utility_viz import Canvas, levels, parse_latex, solve

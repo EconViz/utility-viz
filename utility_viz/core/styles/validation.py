@@ -1,6 +1,6 @@
 """Pluggable value checks for styles that need a drawing backend.
 
-Styles are pure data and never import Matplotlib. Whether a colour string or a
+Styles are pure data and never import a renderer. Whether a colour string or a
 marker shape is valid is a backend question, so the rendering layer registers
 the checks when it is imported (see ``utility_viz.core.rendering.style_checks``).
 Until a check is registered the value is accepted and only the backend rejects it.

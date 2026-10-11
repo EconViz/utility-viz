@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from mosaickit import LegendLayer, LegendStyle, MarkerLayer, PathLayer, TextLayer
 
+from utility_viz.core.rendering.labels import placement
 from utility_viz.core.scenes import budget_layers, decomposition_layers, equilibrium_layers, indifference_layers
 from utility_viz.core.scenes.path import smooth_path
 from utility_viz.core.scenes.styles import (
@@ -21,7 +22,7 @@ from utility_viz.core.styles.label import Label, split_label
 from utility_viz.core.styles.legend import Legend
 from utility_viz.core.styles.marker import Marker
 from utility_viz.core.styles.stroke import Stroke
-from utility_viz.enums import LineStyle
+from utility_viz.enums import LabelPosition, LineStyle, UtilityType
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -117,20 +118,31 @@ class LayerMixin:
         marker = (point_marker or Marker()).merged_over(theme.eq_marker)
         marker = Marker(color=point_color, size=point_markersize).merged_over(marker)
         _, bundle_label = split_label(point_label, theme.bundle_label)
-        sub = (substitution_stroke or Stroke()).merged_over(theme.substitution_stroke)
-        inc = (income_stroke or Stroke()).merged_over(theme.income_stroke)
+        bundle_offset, bundle_anchor = _label_placement(bundle_label)
         sub = Stroke(
             color=getattr(substitution, "color", None) or substitution_color,
             width=effect_arrow_linewidth,
             opacity=getattr(substitution, "opacity", None),
             arrow="->",
-        ).merged_over(sub)
+        ).merged_over(theme.substitution_stroke)
+        sub = (substitution_stroke or Stroke()).merged_over(sub)
         inc = Stroke(
             color=getattr(income, "color", None) or income_color,
             width=effect_arrow_linewidth,
             opacity=getattr(income, "opacity", None),
             arrow="->",
-        ).merged_over(inc)
+        ).merged_over(theme.income_stroke)
+        inc = (income_stroke or Stroke()).merged_over(inc)
+        substitution_label = (
+            substitution.resolved_label(theme.effect_label) if substitution is not None else (None, None)
+        )
+        income_label = income.resolved_label(theme.effect_label) if income is not None else (None, None)
+
+        def effect_label(value):
+            text, style = value
+            style = style or theme.effect_label
+            offset, anchor = _label_placement(style)
+            return text, to_mosaic_text(style, family=self.font), offset, anchor, style.visible is not False
 
         self.extend(
             decomposition_layers(
@@ -139,9 +151,14 @@ class LayerMixin:
                 budget_strokes=budgets,
                 bundle_marker=to_mosaic_marker(marker),
                 bundle_text=to_mosaic_text(bundle_label, family=self.font),
+                bundle_text_offset=bundle_offset,
+                bundle_text_anchor=bundle_anchor,
+                bundle_text_visible=bundle_label.visible is not False,
                 substitution_stroke=to_mosaic_stroke(sub),
                 income_stroke=to_mosaic_stroke(inc),
-                effect_text=to_mosaic_text(theme.effect_label, family=self.font),
+                substitution_label=effect_label(substitution_label),
+                income_label=effect_label(income_label),
+                range_y=(getattr(substitution, "y", None), getattr(income, "y", None)),
                 show_arrows=show_arrows,
                 show_x_projections=show_x_projections,
                 label_effects=label_effects,
@@ -219,12 +236,12 @@ class LayerMixin:
     ) -> Self:
         if kwargs:
             names = ", ".join(sorted(kwargs))
-            raise TypeError(f"Matplotlib-specific add_utility options are unsupported: {names}")
+            raise TypeError(f"renderer-specific add_utility options are unsupported: {names}")
         theme = self.legacy_theme
-        selected = (stroke or Stroke()).merged_over(theme.ic_stroke)
-        selected = Stroke(color=color, width=linewidth).merged_over(selected)
+        selected = Stroke(color=color, width=linewidth).merged_over(theme.ic_stroke)
+        selected = (stroke or Stroke()).merged_over(selected)
         layer_id = self._next_id("utility")
-        layers, _ = indifference_layers(
+        layers, computed = indifference_layers(
             func,
             levels,
             self.x_max,
@@ -235,20 +252,16 @@ class LayerMixin:
             label_fmt=(ic_label.text if ic_label and ic_label.text else ic_label_fmt),
             label_style=label_style,
             stroke=to_mosaic_stroke(selected),
+            secondary_stroke=to_mosaic_stroke((secondary_stroke or Stroke()).merged_over(theme.secondary_ic_stroke)),
             legend=label,
         )
+        if ic_label is not None:
+            _, ic_style = split_label(ic_label, theme.ic_label)
+            layers = tuple(_restyle_text(layer, ic_style, self.font) for layer in layers)
         self.extend(layers)
-        _ = (
-            show_rays,
-            show_kinks,
-            kink_radius,
-            show_bliss,
-            ray_stroke,
-            kink_marker,
-            bliss_marker,
-            bliss_label,
-            secondary_stroke,
-        )
+        _add_kink_features(self, func, computed, layer_id, show_rays, show_kinks, kink_radius, ray_stroke, kink_marker)
+        _add_subsistence_lines(self, func, layer_id)
+        _add_bliss_point(self, func, layer_id, show_bliss, selected, bliss_marker, bliss_label)
         return self
 
     def add_budget(
@@ -265,12 +278,12 @@ class LayerMixin:
         stroke: Stroke | None = None,
     ) -> Self:
         theme = self.legacy_theme
-        selected = (stroke or Stroke()).merged_over(theme.budget_stroke)
         selected = Stroke(
             color=color,
             width=linewidth,
             style=LineStyle(linestyle) if linestyle is not None else None,
-        ).merged_over(selected)
+        ).merged_over(theme.budget_stroke)
+        selected = (stroke or Stroke()).merged_over(selected)
         shade = fill if isinstance(fill, Fill) else Fill(opacity=fill_alpha)
         shade = shade.merged_over(theme.budget_fill)
         self.extend(
@@ -302,8 +315,8 @@ class LayerMixin:
     ) -> Self:
         theme = self.legacy_theme
         text, label_style = split_label(label, theme.point_label, "x^*")
-        selected_marker = (marker or Marker()).merged_over(theme.eq_marker)
-        selected_marker = Marker(color=color, size=markersize).merged_over(selected_marker)
+        selected_marker = Marker(color=color, size=markersize).merged_over(theme.eq_marker)
+        selected_marker = (marker or Marker()).merged_over(selected_marker)
         layers = list(
             equilibrium_layers(
                 eq,
@@ -319,17 +332,9 @@ class LayerMixin:
         if text:
             for index, layer in enumerate(layers):
                 if isinstance(layer, TextLayer):
-                    layers[index] = TextLayer(
-                        layer.position,
-                        layer.text,
-                        id=layer.id,
-                        role=layer.role,
-                        style=to_mosaic_text(label_style, family=self.font),
-                        offset=layer.offset,
-                        anchor=layer.anchor,
-                        math=layer.math,
-                        z_index=layer.z_index,
-                    )
+                    if label_style.color is None and selected_marker.color is not None:
+                        label_style = Label(color=selected_marker.color).merged_over(label_style)
+                    layers[index] = _restyle_text(layer, label_style, self.font)
         self.extend(layers)
         return self
 
@@ -347,8 +352,8 @@ class LayerMixin:
             if slope <= self.y_max / self.x_max
             else (self.y_max / slope, self.y_max)
         )
-        selected = (stroke or Stroke()).merged_over(self.legacy_theme.ray_stroke)
-        selected = Stroke(color=color, width=linewidth).merged_over(selected)
+        selected = Stroke(color=color, width=linewidth).merged_over(self.legacy_theme.ray_stroke)
+        selected = (stroke or Stroke()).merged_over(selected)
         self.add(
             PathLayer(
                 ((0, 0), end),
@@ -370,8 +375,8 @@ class LayerMixin:
         marker: Marker | None = None,
     ) -> Self:
         prefix = self._next_id("point")
-        selected = (marker or Marker()).merged_over(self.legacy_theme.point_marker)
-        selected = Marker(color=color, size=markersize).merged_over(selected)
+        selected = Marker(color=color, size=markersize).merged_over(self.legacy_theme.point_marker)
+        selected = (marker or Marker()).merged_over(selected)
         self.add(
             MarkerLayer(
                 ((x, y),),
@@ -382,7 +387,10 @@ class LayerMixin:
             )
         )
         text, style = split_label(label, self.legacy_theme.point_label)
-        if text and style.visible is not False:
+        if text:
+            if style.color is None and selected.color is not None:
+                style = Label(color=selected.color).merged_over(style)
+            label_offset, anchor = _label_placement(style, legacy_offset=offset)
             self.add(
                 TextLayer(
                     (x, y),
@@ -390,9 +398,10 @@ class LayerMixin:
                     id=f"{prefix}.label",
                     role="utility.equilibrium",
                     style=to_mosaic_text(style, family=self.font),
-                    offset=offset or (5, 5),
-                    anchor="bottom-left",
+                    offset=label_offset,
+                    anchor=anchor,
                     math=True,
+                    visible=style.visible is not False,
                     z_index=7,
                 )
             )
@@ -424,8 +433,8 @@ class LayerMixin:
         )
         use_smoothing = path.default_smooth_curve if smooth_curve is None else smooth_curve
         rendered_points, bezier = smooth_path(points) if use_smoothing else (list(points), None)
-        selected = (stroke or Stroke()).merged_over(self.legacy_theme.path_stroke)
-        selected = Stroke(color=color, width=linewidth).merged_over(selected)
+        selected = Stroke(color=color, width=linewidth).merged_over(self.legacy_theme.path_stroke)
+        selected = (stroke or Stroke()).merged_over(selected)
         self.add(
             PathLayer(
                 rendered_points,
@@ -480,7 +489,7 @@ class LayerMixin:
     def show_legend(self, legend: Legend | None = None, **kwargs) -> Self:
         if kwargs:
             names = ", ".join(sorted(kwargs))
-            raise TypeError(f"Matplotlib-specific legend options are unsupported: {names}")
+            raise TypeError(f"renderer-specific legend options are unsupported: {names}")
         selected = (legend or Legend()).merged_over(self.legacy_theme.legend)
         if selected.visible is False:
             return self
@@ -498,9 +507,146 @@ class LayerMixin:
         return self
 
 
+def _add_kink_features(
+    canvas: Any,
+    func: Any,
+    levels: list[float],
+    layer_id: str,
+    show_rays: bool,
+    show_kinks: bool,
+    kink_radius: float,
+    ray_stroke: Stroke | None,
+    kink_marker: Marker | None,
+) -> None:
+    if getattr(func, "utility_type", None) is not UtilityType.KINKED:
+        return
+    if show_rays:
+        for slope in func.ray_slopes():
+            canvas.add_ray(slope, stroke=ray_stroke)
+    if not show_kinks:
+        return
+    chosen = (kink_marker or Marker()).merged_over(canvas.legacy_theme.kink_marker)
+    if kink_marker is None:
+        chosen = Marker(size=4 * kink_radius).merged_over(chosen)
+    points = tuple((float(x), float(y)) for x, y in func.kink_points(levels))
+    if points:
+        canvas.add(
+            MarkerLayer(
+                points,
+                marker=to_mosaic_marker(chosen),
+                id=f"{layer_id}.kinks",
+                role="utility.indifference.kink",
+                z_index=5,
+            )
+        )
+
+
+def _add_subsistence_lines(canvas: Any, func: Any, layer_id: str) -> None:
+    if not hasattr(func, "subsistence_lines"):
+        return
+    sub_x, sub_y = func.subsistence_lines()
+    stroke = to_mosaic_stroke(canvas.legacy_theme.subsistence_stroke)
+    canvas.add(
+        PathLayer(
+            ((sub_x, 0), (sub_x, canvas.y_max)),
+            stroke=stroke,
+            id=f"{layer_id}.subsistence.x",
+            role="utility.indifference.subsistence",
+            z_index=0,
+        )
+    )
+    canvas.add(
+        PathLayer(
+            ((0, sub_y), (canvas.x_max, sub_y)),
+            stroke=stroke,
+            id=f"{layer_id}.subsistence.y",
+            role="utility.indifference.subsistence",
+            z_index=0,
+        )
+    )
+
+
+def _add_bliss_point(
+    canvas: Any,
+    func: Any,
+    layer_id: str,
+    show_bliss: bool,
+    curve_stroke: Stroke,
+    bliss_marker: Marker | None,
+    bliss_label: str | Label | None,
+) -> None:
+    if not show_bliss or not hasattr(func, "bliss_x") or not hasattr(func, "bliss_y"):
+        return
+    chosen = (bliss_marker or Marker()).merged_over(canvas.legacy_theme.bliss_marker)
+    if chosen.color is None:
+        chosen = Marker(color=curve_stroke.color).merged_over(chosen)
+    canvas.add(
+        MarkerLayer(
+            ((func.bliss_x, func.bliss_y),),
+            marker=to_mosaic_marker(chosen),
+            id=f"{layer_id}.bliss",
+            role="utility.indifference.bliss",
+            z_index=5,
+        )
+    )
+    text, style = split_label(bliss_label, canvas.legacy_theme.bliss_label, canvas.legacy_theme.bliss_label.text)
+    if not text:
+        return
+    offset, anchor = _label_placement(style)
+    if style.color is None and chosen.color is not None:
+        style = Label(color=chosen.color).merged_over(style)
+    canvas.add(
+        TextLayer(
+            (func.bliss_x, func.bliss_y),
+            text,
+            style=to_mosaic_text(style, family=canvas.font),
+            offset=offset,
+            anchor=anchor,
+            math=True,
+            visible=style.visible is not False,
+            id=f"{layer_id}.bliss.label",
+            role="utility.indifference.bliss.label",
+            z_index=6,
+        )
+    )
+
+
 def _mosaic_legend_location(position: Any) -> str | None:
     """Translate utility-viz placement names to MosaicKit renderer locations."""
     if position is None:
         return None
     value = str(getattr(position, "value", position))
     return _LEGEND_LOCATIONS.get(value, value)
+
+
+def _label_placement(
+    style: Label, *, legacy_offset: tuple[float, float] | None = None
+) -> tuple[tuple[float, float], str]:
+    """Translate the public point-label placement to MosaicKit's offset/anchor pair."""
+    if style.position is None and legacy_offset is not None:
+        dx, dy = legacy_offset
+        horizontal = "left" if dx >= 0 else "right"
+        vertical = "bottom" if dy >= 0 else "top"
+        return legacy_offset, f"{vertical}-{horizontal}"
+    position = LabelPosition(style.position or LabelPosition.TOP_RIGHT)
+    offset, horizontal, vertical = placement(position, style.offset or 5)
+    anchor = "-".join(part for part in (vertical, horizontal) if part != "center") or "center"
+    return offset, anchor
+
+
+def _restyle_text(layer, style: Label, font: str | None):
+    if not isinstance(layer, TextLayer):
+        return layer
+    offset, anchor = _label_placement(style)
+    return TextLayer(
+        layer.position,
+        layer.text,
+        id=layer.id,
+        role=layer.role,
+        style=to_mosaic_text(style, family=font),
+        offset=offset,
+        anchor=anchor,
+        math=layer.math,
+        visible=style.visible is not False,
+        z_index=layer.z_index,
+    )

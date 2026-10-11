@@ -9,13 +9,14 @@ Dependency direction (a unit may import only from a strictly lower layer)::
         models.optimization, models.curves    layer 3
     core.config, core.rendering,
         models.analysis, models.consumer      layer 4
-    core.diagrams.components, core.scenes     layer 5
-    core.canvas                               layer 6
-    core.layout                               layer 7
+    core.scenes                               layer 5
+    core.diagrams.components                  layer 6
+    core.canvas                               layer 7
+    core.layout                               layer 8
     core.diagrams.consumer, core.animation,
-        core.interactive                      layer 8
-    models (facade), cli                      layer 9
-    root facade                               layer 10
+        core.interactive                      layer 9
+    models (facade), cli                      layer 10
+    root facade                               layer 11
 """
 
 from __future__ import annotations
@@ -43,16 +44,16 @@ LAYERS: dict[str, int] = {
     "core.rendering": 4,
     "models.analysis": 4,
     "models.consumer": 4,
-    "core.diagrams.components": 5,
     "core.scenes": 5,
-    "core.canvas": 6,
-    "core.layout": 7,
-    "core.diagrams.consumer": 8,
-    "core.animation": 8,
-    "core.interactive": 8,
-    "models": 9,
-    "cli": 9,
-    "": 10,
+    "core.diagrams.components": 6,
+    "core.canvas": 7,
+    "core.layout": 8,
+    "core.diagrams.consumer": 9,
+    "core.animation": 9,
+    "core.interactive": 9,
+    "models": 10,
+    "cli": 10,
+    "": 11,
 }
 
 
@@ -216,7 +217,7 @@ _SCENE_FORBIDDEN = (
 
 
 def test_scene_modules_import_no_matplotlib_or_legacy_drawing():
-    """``core.scenes`` builds mosaickit layers only: no matplotlib, no legacy drawing layers."""
+    """``core.scenes`` builds MosaicKit layers only, with no legacy drawing imports."""
     offenders = []
     scene_modules = [(m, p) for m, p in _modules() if m == "core.scenes" or m.startswith("core.scenes.")]
     assert scene_modules, "core.scenes package is missing"
@@ -253,32 +254,6 @@ def test_models_curves_import_no_matplotlib():
 
 PURE_DATA_UNITS = ("core.styles", "core.themes")
 
-# Migration debt ceiling.  Removing entries is always allowed; adding a new direct
-# Matplotlib dependency is not.  Task 5 replaces this allowlist with ``assert not
-# offenders`` once the last legacy drawing path has moved to MosaicKit.
-LEGACY_MATPLOTLIB_MODULES = {
-    "core.animation.animator",
-    "core.canvas.base",
-    "core.canvas.decomposition",
-    "core.canvas.legend",
-    "core.canvas.renderers.path",
-    "core.canvas.style",
-    "core.diagrams.components._corners",
-    "core.diagrams.components.indifference",
-    "core.diagrams.consumer.demand",
-    "core.diagrams.consumer.edgeworth.base",
-    "core.diagrams.consumer.edgeworth.box",
-    "core.export.backend_tikz",
-    "core.export.backend_tikz._path",
-    "core.export.backend_tikz.renderer",
-    "core.export.exporter",
-    "core.layout.figure",
-    "core.interactive.widgets",
-    "core.rendering.fonts",
-    "core.rendering.stroke",
-    "core.rendering.style_checks",
-}
-
 
 def _third_party_roots(path: Path) -> set[str]:
     roots: set[str] = set()
@@ -290,13 +265,13 @@ def _third_party_roots(path: Path) -> set[str]:
     return roots
 
 
-def test_no_new_direct_matplotlib_dependencies_during_migration():
+def test_production_code_has_no_direct_matplotlib_dependency():
     offenders = {module for module, path in _modules() if "matplotlib" in _third_party_roots(path)}
-    assert offenders <= LEGACY_MATPLOTLIB_MODULES, sorted(offenders - LEGACY_MATPLOTLIB_MODULES)
+    assert not offenders, sorted(offenders)
 
 
 def test_styles_and_themes_are_pure_data_without_matplotlib():
-    """Styles and themes describe a look; only the drawing layers may import Matplotlib."""
+    """Styles and themes are renderer-neutral data."""
     offenders = [
         module
         for module, path in _modules()

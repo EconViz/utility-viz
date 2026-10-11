@@ -2176,8 +2176,6 @@ version = "2.0.0b2"
 source = { editable = "." }
 dependencies = [
     { name = "bezierkit" },
-    { name = "matplotlib", version = "3.10.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "matplotlib", version = "3.11.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "mosaickit" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
@@ -2221,7 +2219,6 @@ requires-dist = [
     { name = "ipython", marker = "extra == 'interactive'", specifier = ">=8.0.0" },
     { name = "ipywidgets", marker = "extra == 'all'", specifier = ">=8.0.0" },
     { name = "ipywidgets", marker = "extra == 'interactive'", specifier = ">=8.0.0" },
-    { name = "matplotlib", specifier = ">=3.6.0,<4.0.0" },
     { name = "mosaickit", specifier = ">=0.5.1,<0.6.0" },
     { name = "numpy", specifier = ">=1.24.0" },
     { name = "pillow", marker = "extra == 'all'", specifier = ">=9.0.0" },

@@ -16,13 +16,13 @@ class ExportFormat(Enum):
     Members
     -------
     PNG
-        Raster export via matplotlib (default).
+        Raster image export (default).
     PDF
-        Vector export via matplotlib.
+        PDF vector export.
     SVG
-        Scalable vector export via matplotlib.
+        Scalable vector export.
     TEX
-        Pure TikZ export via the custom renderer.
+        Pure TikZ export from the scene graph.
     """
 
     PNG = "png"

@@ -1,23 +1,46 @@
-"""Matplotlib-backed validation of colour and marker-shape strings used by styles."""
+"""Backend-neutral validation of colour and marker-shape strings."""
 
 from __future__ import annotations
 
-from matplotlib.colors import is_color_like
-from matplotlib.markers import MarkerStyle
+import re
 
 from utility_viz.core.styles.validation import register_checks
 
 
 def _is_color(value: str) -> bool:
-    return bool(is_color_like(value))
+    if re.fullmatch(r"#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?([0-9a-fA-F]{2})?", value):
+        return True
+    return value.lower() in {
+        "black",
+        "white",
+        "red",
+        "green",
+        "blue",
+        "yellow",
+        "orange",
+        "purple",
+        "pink",
+        "brown",
+        "gray",
+        "grey",
+        "lightgray",
+        "lightgrey",
+        "darkgray",
+        "darkgrey",
+        "cyan",
+        "magenta",
+        "teal",
+        "navy",
+        "olive",
+        "maroon",
+        "gold",
+        "transparent",
+        "none",
+    }
 
 
 def _is_shape(value: str) -> bool:
-    try:
-        MarkerStyle(value)
-    except ValueError:
-        return False
-    return True
+    return value in {"o", "s", "^", "v", "<", ">", "D", "d", "*", "+", "x", ".", ",", "p", "h", "H", "|", "_"}
 
 
 register_checks(color=_is_color, shape=_is_shape)

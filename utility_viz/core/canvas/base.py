@@ -113,7 +113,7 @@ class Canvas(LayerMixin, MosaicCanvas):
             dpi=self.dpi,
             x_label="",
             y_label="",
-            title=self.title,
+            title=None,
         )
         super().__init__(spec=spec, theme=to_mosaic_theme(legacy_theme, font=selected_font))
         self.extend(self._axis_layers())
@@ -126,6 +126,16 @@ class Canvas(LayerMixin, MosaicCanvas):
     def _axis_layers(self) -> tuple:
         x_offset, x_anchor = _LABEL_LAYOUT[self.x_label_pos]
         y_offset, y_anchor = _LABEL_LAYOUT[self.y_label_pos]
+        if self.x_label_style.offset is not None:
+            x_offset = (
+                x_offset[0] / 8 * self.x_label_style.offset,
+                x_offset[1] / 8 * self.x_label_style.offset,
+            )
+        if self.y_label_style.offset is not None:
+            y_offset = (
+                y_offset[0] / 8 * self.y_label_style.offset,
+                y_offset[1] / 8 * self.y_label_style.offset,
+            )
         layers: list = [
             PathLayer(
                 ((0, 0), (self.x_max, 0)),
@@ -182,6 +192,19 @@ class Canvas(LayerMixin, MosaicCanvas):
                     anchor="top-right",
                 )
             )
+        if self.title and self.title_style.visible is not False:
+            layers.append(
+                TextLayer(
+                    (self.x_max / 2, self.y_max),
+                    self.title,
+                    id="canvas.title",
+                    role="title",
+                    style=to_mosaic_text(self.title_style, family=self.font),
+                    offset=(0, 12),
+                    anchor="bottom",
+                    z_index=10,
+                )
+            )
         return tuple(layers)
 
     def set_axis_visibility(self, *, show_x_label: bool = True, show_y_label: bool = True) -> Canvas:
@@ -205,7 +228,8 @@ class Canvas(LayerMixin, MosaicCanvas):
         path = Path(target)
         if path.suffix.lower() == ".tex":
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(canvas_to_tikz(self), encoding="utf-8")
+            standalone = bool(options.pop("tikz_standalone", True))
+            path.write_text(canvas_to_tikz(self, standalone=standalone), encoding="utf-8")
             return [path]
         path.parent.mkdir(parents=True, exist_ok=True)
         return super().save(path, **options)

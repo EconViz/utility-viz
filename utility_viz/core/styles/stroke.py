@@ -20,7 +20,7 @@ class Stroke:
     style : LineStyle or str, optional
         ``"solid"``, ``"dashed"``, ``"dotted"``, or ``"dashdot"``.
     color : str, optional
-        Any Matplotlib colour.
+        Any supported named or hexadecimal colour.
     arrow : ArrowStyle or str, optional
         Arrowhead drawn at the end of the line.
     opacity : float, optional

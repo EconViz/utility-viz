@@ -4,10 +4,6 @@ Renders the same equilibrium diagram before and after highlighting, and once
 more with ordinal (`u_1, u_2, u_3`) labels instead of raw utility values.
 """
 
-import matplotlib
-
-matplotlib.use("Agg")
-
 from pathlib import Path
 
 from utility_viz import Canvas, levels, solve

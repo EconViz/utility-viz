@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+from mosaickit import TextLayer
+
 from utility_viz import Figure, Layout, levels, solve
 from utility_viz.models import CobbDouglas
 
@@ -21,7 +23,16 @@ fig = Figure(
     math_font="stix",
 )
 for panel, title in zip(fig.canvases, ["Utility map", "With budget"], strict=True):
-    panel.ax.set_title(title)
+    panel.add(
+        TextLayer(
+            (panel.x_max / 2, panel.y_max),
+            title,
+            id="panel.title",
+            role="title",
+            offset=(0, 12),
+            anchor="bottom",
+        )
+    )
     panel.add_utility(model, levels=levels.around(eq.utility, n=3), label="IC")
 fig[1].add_budget(2.0, 3.0, 30.0, fill=True, label="BC").add_equilibrium(eq).show_legend()
 

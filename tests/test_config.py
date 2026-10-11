@@ -1,12 +1,7 @@
 """Tests for Config: TOML settings mapped onto Theme properties (#112)."""
 
-import matplotlib
-
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
 import pytest
-from matplotlib.colors import to_hex
+from mosaickit import FillLayer, MarkerLayer, PathLayer
 
 from utility_viz import Canvas, Config, Figure, Layout, themes
 from utility_viz.core.config.settings import template
@@ -55,7 +50,6 @@ position = "bottom"
 def reset_config():
     yield
     Config.reset()
-    plt.close("all")
 
 
 @pytest.fixture
@@ -125,10 +119,10 @@ class TestUse:
     def test_use_sets_the_default_for_new_diagrams(self, example):
         Config.load(example).use()
         cvs = Canvas().add_budget(2, 3, 30)
-        budget = next(a for a in cvs.ax.lines if getattr(a, "_ev_role", None) == "budget")
-        assert budget.get_linewidth() == 3.0
+        budget = next(a for a in cvs.snapshot().ordered_layers if isinstance(a, PathLayer) and a.id == "budget")
+        assert budget.stroke.width == 3.0
         assert cvs.math_font == "stix"
-        assert not next(a for a in cvs.ax.texts if getattr(a, "_ev_role", None) == "origin_label").get_visible()
+        assert not any(a.id == "axes.origin.label" for a in cvs.snapshot().ordered_layers)
 
     def test_config_markers_and_strokes_are_drawn(self, example):
         from utility_viz import solve
@@ -136,39 +130,39 @@ class TestUse:
         Config.load(example).use()
         eq = solve(CobbDouglas(), px=2.0, py=3.0, income=30.0)
         cvs = Canvas(x_max=20, y_max=15).add_equilibrium(eq)
-        point = next(a for a in cvs.ax.lines if getattr(a, "_ev_role", None) == "equilibrium")
-        assert point.get_markersize() == 7
+        point = next(a for a in cvs.snapshot().ordered_layers if isinstance(a, MarkerLayer))
+        assert point.marker.size == 7**2
 
     def test_explicit_stroke_beats_config(self, example):
         from utility_viz import Stroke
 
         Config.load(example).use()
         cvs = Canvas().add_budget(2, 3, 30, stroke=Stroke(width=1.0))
-        budget = next(a for a in cvs.ax.lines if getattr(a, "_ev_role", None) == "budget")
-        assert budget.get_linewidth() == 1.0
-        assert budget.get_linestyle() == "--"  # style still from the config
+        budget = next(a for a in cvs.snapshot().ordered_layers if isinstance(a, PathLayer) and a.id == "budget")
+        assert budget.stroke.width == 1.0
+        assert budget.stroke.dash.value == "dashed"  # style still from the config
 
     def test_explicit_theme_wins(self, example):
         Config.load(example).use()
-        assert Canvas(theme=themes.nord).theme is themes.nord
+        assert Canvas(theme=themes.nord).legacy_theme is themes.nord
 
     def test_reset(self, example):
         Config.load(example).use()
         Config.reset()
-        assert Canvas().theme is themes.default
+        assert Canvas().legacy_theme is themes.default
         assert Config.active().theme is themes.default
 
     def test_figure_and_edgeworth_follow_the_config(self, example):
         Config.load(example).use()
         fig = Figure(Layout.SIDE_BY_SIDE)
-        assert all(cvs.theme.ic_color == "#2E86AB" for cvs in fig.canvases)
+        assert all(cvs.legacy_theme.ic_color == "#2E86AB" for cvs in fig.canvases)
         box = EdgeworthBox(CobbDouglas(), CobbDouglas(), total_x=10.0, total_y=10.0)
-        assert box.theme.ic_color == "#2E86AB"
+        assert box.legacy_theme.ic_color == "#2E86AB"
 
     def test_theme_alone(self, example):
         cvs = Canvas(x_max=20, y_max=15, theme=Config.load(example).theme).add_budget(2, 3, 30, fill=True)
-        fill = next(a for a in cvs.ax.get_children() if getattr(a, "_ev_role", None) == "budget_fill")
-        assert to_hex(fill.get_facecolor()[0]) == to_hex("lightgrey")
+        fill = next(a for a in cvs.snapshot().ordered_layers if isinstance(a, FillLayer))
+        assert fill.fill.color.to_hex() == "#D3D3D3"
         assert Config.active().theme is themes.default
 
 

@@ -38,10 +38,14 @@ class IndifferenceMixin(PointsMixin):
         _, _, utility_a, utility_b = self._utility_surfaces(res)
         selected_a = percentile_levels(utility_a, n=levels_a) if isinstance(levels_a, int) else list(levels_a)
         selected_b = percentile_levels(utility_b, n=levels_b) if isinstance(levels_b, int) else list(levels_b)
-        style_a = (stroke_a or Stroke()).merged_over(self.legacy_theme.ic_stroke)
-        style_b = (stroke_b or Stroke()).merged_over(self.legacy_theme.path_stroke)
-        style_a = Stroke(color=color_a or self.utility_a_color, width=linewidth).merged_over(style_a)
-        style_b = Stroke(color=color_b or self.utility_b_color, width=linewidth).merged_over(style_b)
+        style_a = Stroke(color=color_a or self.utility_a_color, width=linewidth).merged_over(
+            self.legacy_theme.ic_stroke
+        )
+        style_b = Stroke(color=color_b or self.utility_b_color, width=linewidth).merged_over(
+            self.legacy_theme.path_stroke
+        )
+        style_a = (stroke_a or Stroke()).merged_over(style_a)
+        style_b = (stroke_b or Stroke()).merged_over(style_b)
         self.extend(
             edgeworth_indifference_layers(
                 self.utility_a,

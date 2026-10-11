@@ -4,10 +4,6 @@ Also demonstrates Satiation and QuasiLinear initialisation, including
 an intentional validation failure for QuasiLinear(v_func=lambda z: z**2).
 """
 
-import matplotlib
-
-matplotlib.use("Agg")
-
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any

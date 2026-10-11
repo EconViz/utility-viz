@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from mosaickit import Canvas as MosaicCanvas
-from mosaickit import CanvasSpec, LegendLayer, LegendStyle
+from mosaickit import CanvasSpec, LegendLayer, LegendStyle, TextLayer
 
 from utility_viz.core.config.settings import Config
 from utility_viz.core.constants.canvas import DEFAULT_DPI, MAX_DPI, MIN_DPI
@@ -68,7 +68,7 @@ class EdgeworthBox(IndifferenceMixin, MosaicCanvas):
                 width=7.0,
                 height=6.0,
                 dpi=self.dpi,
-                title=self.title,
+                title=None,
             ),
             theme=to_mosaic_theme(selected_theme),
         )
@@ -84,6 +84,19 @@ class EdgeworthBox(IndifferenceMixin, MosaicCanvas):
                 origin_style=to_mosaic_text(self.origin_style),
             )
         )
+        if self.title and self.title_style.visible is not False:
+            self.add(
+                TextLayer(
+                    (self.total_x / 2, self.total_y),
+                    self.title,
+                    style=to_mosaic_text(self.title_style),
+                    offset=(0, 12),
+                    anchor="bottom",
+                    id="box.title",
+                    role="title",
+                    z_index=10,
+                )
+            )
 
     def _next_id(self, prefix: str) -> str:
         count = self._layer_counts.get(prefix, 0) + 1
@@ -97,7 +110,7 @@ class EdgeworthBox(IndifferenceMixin, MosaicCanvas):
 
     def show_legend(self, legend: Legend | None = None, **kwargs) -> EdgeworthBox:
         if kwargs:
-            raise TypeError("Matplotlib-specific legend options are unsupported")
+            raise TypeError("renderer-specific legend options are unsupported")
         selected = (legend or Legend()).merged_over(self.legacy_theme.legend)
         if selected.visible is not False:
             location = str(getattr(selected.position, "value", selected.position or "best"))

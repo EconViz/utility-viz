@@ -4,8 +4,7 @@ Curve layers whose ``model`` is a bezierkit ``PiecewiseBezier`` (the indifferenc
 are written with bezierkit's native ``.. controls ..`` serialiser, i.e. from the same
 Bezier source the raster backend sampled. Other paths are polylines, markers are circles,
 and text becomes nodes. Styles come from the canvas theme through the same role
-resolution mosaickit's Matplotlib renderer uses, and colour names resolve against the
-canvas palette. mosaickit itself ships no TikZ renderer.
+resolution used by the MosaicKit scene, and colour names resolve against the canvas palette.
 """
 
 from __future__ import annotations
@@ -104,9 +103,43 @@ def _marker_commands(layer: MarkerLayer, bundle: Any, colors: _Colors) -> list[s
     opts = [colors.name(marker.color)]  # type: ignore[arg-type]
     if marker.opacity is not None and marker.opacity < 1:
         opts.append(f"opacity={_number(marker.opacity)}")
-    return [
-        f"\\fill[{','.join(opts)}] ({_number(x)},{_number(y)}) circle ({_number(radius)}pt);" for x, y in layer.points
-    ]
+    shape = marker.shape or "o"
+    return [_marker_command(x, y, radius, shape, opts) for x, y in layer.points]
+
+
+def _marker_command(x: float, y: float, radius: float, shape: str, opts: list[str]) -> str:
+    """Emit common MosaicKit marker shapes without depending on a TikZ plot backend."""
+    at = f"({_number(x)},{_number(y)})"
+    style = ",".join(opts)
+    r = _number(radius)
+    if shape in {"s", "square"}:
+        return f"\\fill[{style}] ([xshift=-{r}pt,yshift=-{r}pt]{at}) rectangle ([xshift={r}pt,yshift={r}pt]{at});"
+    if shape in {"D", "d", "diamond"}:
+        return (
+            f"\\fill[{style}] ([yshift={r}pt]{at}) -- ([xshift={r}pt]{at}) -- "
+            f"([yshift=-{r}pt]{at}) -- ([xshift=-{r}pt]{at}) -- cycle;"
+        )
+    if shape in {"^", "v", "<", ">"}:
+        vertices = {
+            "^": ((0, 1), (1, -1), (-1, -1)),
+            "v": ((0, -1), (1, 1), (-1, 1)),
+            "<": ((-1, 0), (1, 1), (1, -1)),
+            ">": ((1, 0), (-1, 1), (-1, -1)),
+        }[shape]
+        points = " -- ".join(
+            f"([xshift={_number(dx * radius)}pt,yshift={_number(dy * radius)}pt]{at})" for dx, dy in vertices
+        )
+        return f"\\fill[{style}] {points} -- cycle;"
+    if shape == "*":
+        star_points: list[str] = []
+        for index in range(10):
+            angle = math.pi / 2 + index * math.pi / 5
+            length = radius if index % 2 == 0 else radius * 0.4
+            star_points.append(
+                f"([xshift={_number(math.cos(angle) * length)}pt,yshift={_number(math.sin(angle) * length)}pt]{at})"
+            )
+        return f"\\fill[{style}] {' -- '.join(star_points)} -- cycle;"
+    return f"\\fill[{style}] {at} circle ({r}pt);"
 
 
 def _text_command(layer: TextLayer, bundle: Any, colors: _Colors) -> str:

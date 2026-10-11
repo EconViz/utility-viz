@@ -78,7 +78,7 @@ def _math_wrap(text: str) -> str:
 
     Segments already enclosed in ``$...$`` are left untouched.  Plain-text
     segments that contain any of ``^ _ { } \\`` are automatically wrapped so
-    that matplotlib renders them via its mathtext engine.
+    that the scene text renderer treats them as mathematical notation.
     """
     parts = re.split(r"(\$[^$]+\$)", text)
     out = []

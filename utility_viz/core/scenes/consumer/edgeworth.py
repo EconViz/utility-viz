@@ -102,6 +102,9 @@ def edgeworth_point_layers(
     label: str,
     marker: Marker | None,
     text: TextStyle | None,
+    text_offset: tuple[float, float] = (6, 6),
+    text_anchor: str = "bottom-left",
+    text_visible: bool = True,
 ) -> tuple[Layer, ...]:
     return (
         MarkerLayer((point,), marker=marker, id=layer_id, role=f"utility.edgeworth.{layer_id}", z_index=6),
@@ -110,8 +113,9 @@ def edgeworth_point_layers(
             label,
             style=text,
             math=True,
-            offset=(6, 6),
-            anchor="bottom-left",
+            offset=text_offset,
+            anchor=text_anchor,
+            visible=text_visible,
             id=f"{layer_id}.label",
             role=f"utility.edgeworth.{layer_id}.label",
             z_index=7,

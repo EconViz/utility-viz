@@ -3,10 +3,6 @@
 from pathlib import Path
 from typing import Any
 
-import matplotlib
-
-matplotlib.use("Agg")
-
 import numpy as np
 
 from utility_viz import EdgeworthBox, EquilibriumFocusConfig, themes

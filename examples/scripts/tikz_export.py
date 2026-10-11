@@ -5,14 +5,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 
 from utility_viz import Canvas, levels, solve
-from utility_viz.core.export.backend_tikz import figure_to_tikz
+from utility_viz.core.scenes import canvas_to_tikz
 from utility_viz.models import (
     CES,
     CobbDouglas,
@@ -109,8 +105,7 @@ def _build_case(
 
 
 def _case_snippet(label: str, canvas: Canvas) -> str:
-    snippet = figure_to_tikz(canvas.fig, standalone=False)
-    plt.close(canvas.fig)
+    snippet = canvas_to_tikz(canvas, standalone=False)
     return "\n".join(
         [
             rf"% {label}",

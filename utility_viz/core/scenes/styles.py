@@ -50,13 +50,44 @@ _ARROWS = {
     ArrowStyle.WEDGE: MosaicArrowStyle.WEDGE,
 }
 
+_NAMED_COLORS = {
+    "black": "#000000",
+    "white": "#ffffff",
+    "red": "#ff0000",
+    "green": "#008000",
+    "blue": "#0000ff",
+    "yellow": "#ffff00",
+    "orange": "#ffa500",
+    "purple": "#800080",
+    "pink": "#ffc0cb",
+    "brown": "#a52a2a",
+    "gray": "#808080",
+    "grey": "#808080",
+    "lightgray": "#d3d3d3",
+    "lightgrey": "#d3d3d3",
+    "darkgray": "#a9a9a9",
+    "darkgrey": "#a9a9a9",
+    "cyan": "#00ffff",
+    "magenta": "#ff00ff",
+    "teal": "#008080",
+    "navy": "#000080",
+    "olive": "#808000",
+    "maroon": "#800000",
+    "gold": "#ffd700",
+}
+
+
+def _color(value: str | None) -> str | None:
+    """Keep MosaicKit palette tokens, but make public CSS color names unambiguous."""
+    return _NAMED_COLORS.get(value.lower(), value) if value is not None else None
+
 
 def to_mosaic_stroke(value: Stroke | None) -> MosaicStroke | None:
     """Convert a sparse public stroke without filling in theme defaults."""
     if value is None:
         return None
     return MosaicStroke(
-        color=value.color,
+        color=_color(value.color),
         width=value.width,
         dash=_DASHES[LineStyle(value.style)] if value.style is not None else None,
         arrow=_ARROWS[ArrowStyle(value.arrow)] if value.arrow is not None else None,
@@ -68,7 +99,7 @@ def to_mosaic_fill(value: Fill | None) -> MosaicFill | None:
     """Convert a sparse public fill."""
     if value is None:
         return None
-    return MosaicFill(color=value.color, opacity=value.opacity)
+    return MosaicFill(color=_color(value.color), opacity=value.opacity)
 
 
 def to_mosaic_marker(value: Marker | None) -> MosaicMarker | None:
@@ -77,11 +108,11 @@ def to_mosaic_marker(value: Marker | None) -> MosaicMarker | None:
         return None
     size = value.size**2 if value.size is not None else None
     return MosaicMarker(
-        color=value.color,
+        color=_color(value.color),
         size=size,
         shape=value.shape,
         opacity=value.opacity,
-        edge_color=value.color,
+        edge_color=_color(value.color),
         edge_width=0 if value.color is not None else None,
     )
 
@@ -96,7 +127,7 @@ def to_mosaic_text(value: Label | None, *, family: str | None = None) -> TextSty
         return None
     label = value or Label()
     return TextStyle(
-        color=label.color,
+        color=_color(label.color),
         size=label.fontsize,
         family=family,
         opacity=label.opacity,
@@ -110,6 +141,9 @@ def to_mosaic_theme(value: Any, *, font: str | None = None) -> MosaicTheme:
     from utility_viz.core.scenes.theme import UtilityColors, utility_theme
 
     colors = UtilityColors(
+        axis_color=value.axis_color,
+        label_color=value.label_color,
+        background_color=value.background_color,
         ic_color=value.ic_color,
         ic_linewidth=value.ic_linewidth,
         secondary_ic_color=value.secondary_ic_color,

@@ -132,9 +132,7 @@ class Figure:
 
     @property
     def grid(self) -> CanvasGrid:
-        return CanvasGrid.from_layout(
-            cast(list[MosaicCanvas], self.canvases), MosaicLayout(self.layout.value)
-        )
+        return CanvasGrid.from_layout(cast(list[MosaicCanvas], self.canvases), MosaicLayout(self.layout.value))
 
     def __getitem__(self, idx: int | tuple[int, int]) -> Canvas:
         return self._grid_lookup[idx] if isinstance(idx, tuple) else self.canvases[idx]

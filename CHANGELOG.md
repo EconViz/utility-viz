@@ -4,6 +4,13 @@
 
 ## v2.0.0b2 (2026-10-10)
 
+### Breaking changes
+
+- Complete the MosaicKit/BezierKit migration: `Canvas`, `Figure`, animation,
+  interactive widgets, demand diagrams, and Edgeworth boxes now compose backend-neutral
+  scenes. The renderer-owned `Canvas.fig` and `Canvas.ax` escape hatches and `fig=`/`ax=`
+  injection are no longer available; compose panels with `Figure` instead.
+
 ### Bug fixes
 
 - Require the stable `bezierkit>=1.0.1,<2.0.0` release instead of the obsolete
@@ -14,6 +21,10 @@
 
 - Verify the stable BezierKit 1.x API against level-set tracing, sampled scene
   paths, native TikZ export, and the complete UtilityViz test suite.
+
+- Remove the legacy axes-mutating drawing modules and the direct Matplotlib dependency.
+  PNG/PDF/SVG output is rendered through MosaicKit, while TikZ serializes the same scene
+  and preserves native BezierKit curves.
 
 ## v2.0.0b1 (2026-10-03)
 

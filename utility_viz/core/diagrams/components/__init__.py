@@ -1,20 +1,24 @@
-"""Reusable drawing components for economic diagrams."""
+"""Reusable backend-neutral economic diagram components."""
+
+from mosaickit import DashStyle, PathLayer, Stroke
 
 from utility_viz.core.diagrams.components.budget import BudgetConstraint
 from utility_viz.core.diagrams.components.equilibrium import EquilibriumPoint
 from utility_viz.core.diagrams.components.indifference import IndifferenceCurves
-from utility_viz.core.rendering.stroke import tag
 
-__all__ = ["IndifferenceCurves", "BudgetConstraint", "EquilibriumPoint"]
+__all__ = ["BudgetConstraint", "EquilibriumPoint", "IndifferenceCurves", "draw_ray"]
 
 
-def draw_ray(ax, slope, x_max, y_max, color, linewidth, linestyle="--"):
-    """Draw a dashed ray from the origin, clipped to the visible area."""
-    x_end = x_max
-    y_end = slope * x_end
+def draw_ray(canvas, slope, x_max, y_max, color, linewidth, linestyle="--"):
+    """Append a clipped ray to a MosaicKit canvas and return its layer."""
+    x_end, y_end = x_max, slope * x_max
     if y_end > y_max:
-        y_end = y_max
-        x_end = y_end / slope
-    (line,) = ax.plot([0, x_end], [0, y_end], color=color, linestyle=linestyle, linewidth=linewidth)
-    tag(line, "ray")
-    return line
+        y_end, x_end = y_max, y_max / slope
+    dash = {"-": DashStyle.SOLID, "--": DashStyle.DASHED, ":": DashStyle.DOTTED, "-.": DashStyle.DASHDOT}
+    layer = PathLayer(
+        ((0.0, 0.0), (x_end, y_end)),
+        stroke=Stroke(color=color, width=linewidth, dash=dash[linestyle]),
+        role="utility.equilibrium.ray",
+    )
+    canvas.add(layer)
+    return layer
