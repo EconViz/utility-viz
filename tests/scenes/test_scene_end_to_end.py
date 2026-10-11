@@ -85,6 +85,14 @@ def test_tikz_exports_canvas_background():
     assert "1E1E1E" in source
 
 
+def test_tikz_preserves_preformatted_math_text():
+    from utility_viz import Canvas as UtilityCanvas
+
+    source = canvas_to_tikz(UtilityCanvas(title=r"$U=\min(2x+y,\ x+3y)$"))
+    assert r"{$U=\min(2x+y,\ x+3y)$};" in source
+    assert r"\textbackslash" not in source
+
+
 @pytest.mark.skipif(shutil.which("pdflatex") is None, reason="pdflatex is not installed")
 def test_tikz_compiles_with_pdflatex(canvas, tmp_path):
     tex = tmp_path / "cd.tex"

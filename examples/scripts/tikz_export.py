@@ -122,6 +122,7 @@ def _write_multi_standalone(cases: list[tuple[str, Canvas]]) -> None:
         [
             r"\documentclass[multi=tikzpicture,border=8pt]{standalone}",
             r"\usepackage{tikz}",
+            r"\usetikzlibrary{arrows.meta}",
             r"\usepackage{amsmath}",
             r"\begin{document}",
             *snippets,

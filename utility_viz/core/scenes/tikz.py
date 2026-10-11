@@ -2,8 +2,8 @@
 
 Curve layers whose ``model`` is a bezierkit ``PiecewiseBezier`` (the indifference curves)
 are written with bezierkit's native ``.. controls ..`` serialiser, i.e. from the same
-Bezier source the raster backend sampled. Other paths are polylines, markers are circles,
-and text becomes nodes. Styles come from the canvas theme through the same role
+Bezier source the raster backend sampled. Other paths are polylines, markers use native
+TikZ paths, and text becomes nodes. Styles come from the canvas theme through the same role
 resolution used by the MosaicKit scene, and colour names resolve against the canvas palette.
 """
 
@@ -121,16 +121,23 @@ def _marker_commands(layer: MarkerLayer, bundle: Any, colors: _Colors) -> list[s
 
 def _marker_command(x: float, y: float, radius: float, shape: str, opts: list[str]) -> str:
     """Emit common MosaicKit marker shapes without depending on a TikZ plot backend."""
-    at = f"({_number(x)},{_number(y)})"
+    coordinate = f"{_number(x)},{_number(y)}"
+    at = f"({coordinate})"
     style = ",".join(opts)
     r = _number(radius)
+
+    def shifted(dx: float, dy: float) -> str:
+        return f"([xshift={_number(dx)}pt,yshift={_number(dy)}pt]{coordinate})"
+
+    def polygon(vertices: list[tuple[float, float]]) -> str:
+        points = " -- ".join(shifted(dx * radius, dy * radius) for dx, dy in vertices)
+        return f"\\fill[{style}] {points} -- cycle;"
+
     if shape in {"s", "square"}:
-        return f"\\fill[{style}] ([xshift=-{r}pt,yshift=-{r}pt]{at}) rectangle ([xshift={r}pt,yshift={r}pt]{at});"
+        return f"\\fill[{style}] {shifted(-radius, -radius)} rectangle {shifted(radius, radius)};"
     if shape in {"D", "d", "diamond"}:
-        return (
-            f"\\fill[{style}] ([yshift={r}pt]{at}) -- ([xshift={r}pt]{at}) -- "
-            f"([yshift=-{r}pt]{at}) -- ([xshift=-{r}pt]{at}) -- cycle;"
-        )
+        width_ratio = 0.65 if shape == "d" else 1
+        return polygon([(0, 1), (width_ratio, 0), (0, -1), (-width_ratio, 0)])
     if shape in {"^", "v", "<", ">"}:
         vertices = {
             "^": ((0, 1), (1, -1), (-1, -1)),
@@ -138,19 +145,37 @@ def _marker_command(x: float, y: float, radius: float, shape: str, opts: list[st
             "<": ((-1, 0), (1, 1), (1, -1)),
             ">": ((1, 0), (-1, 1), (-1, -1)),
         }[shape]
-        points = " -- ".join(
-            f"([xshift={_number(dx * radius)}pt,yshift={_number(dy * radius)}pt]{at})" for dx, dy in vertices
-        )
-        return f"\\fill[{style}] {points} -- cycle;"
+        return polygon(list(vertices))
     if shape == "*":
-        star_points: list[str] = []
+        star_points: list[tuple[float, float]] = []
         for index in range(10):
             angle = math.pi / 2 + index * math.pi / 5
-            length = radius if index % 2 == 0 else radius * 0.4
-            star_points.append(
-                f"([xshift={_number(math.cos(angle) * length)}pt,yshift={_number(math.sin(angle) * length)}pt]{at})"
-            )
-        return f"\\fill[{style}] {' -- '.join(star_points)} -- cycle;"
+            length = 1 if index % 2 == 0 else 0.4
+            star_points.append((math.cos(angle) * length, math.sin(angle) * length))
+        return polygon(star_points)
+    if shape in {"p", "h", "H"}:
+        sides = 5 if shape == "p" else 6
+        rotation = math.pi / 2 if shape != "H" else 0
+        return polygon(
+            [
+                (math.cos(rotation + index * 2 * math.pi / sides), math.sin(rotation + index * 2 * math.pi / sides))
+                for index in range(sides)
+            ]
+        )
+    if shape in {"+", "x", "|", "_"}:
+        segments = {
+            "+": [((-1, 0), (1, 0)), ((0, -1), (0, 1))],
+            "x": [((-1, -1), (1, 1)), ((-1, 1), (1, -1))],
+            "|": [((0, -1), (0, 1))],
+            "_": [((-1, 0), (1, 0))],
+        }[shape]
+        paths = " ".join(
+            f"\\draw[{style},line width={_number(max(radius / 2, 0.5))}pt] "
+            f"{shifted(start[0] * radius, start[1] * radius)} -- {shifted(end[0] * radius, end[1] * radius)};"
+            for start, end in segments
+        )
+        return paths
+    r = _number(radius * 0.3) if shape in {".", ","} else r
     return f"\\fill[{style}] {at} circle ({r}pt);"
 
 
@@ -174,7 +199,14 @@ def _text_command(layer: TextLayer, bundle: Any, colors: _Colors) -> str:
         opts.append(f"text opacity={_number(style.opacity)}")
     if anchor:
         opts.insert(0, f"anchor={anchor}")
-    text = f"${layer.text}$" if layer.math else "".join(_ESCAPES.get(c, c) for c in str(layer.text))
+    raw_text = str(layer.text)
+    already_math = len(raw_text) >= 2 and raw_text.startswith("$") and raw_text.endswith("$")
+    if layer.math:
+        text = f"${raw_text}$"
+    elif already_math:
+        text = raw_text
+    else:
+        text = "".join(_ESCAPES.get(c, c) for c in raw_text)
     px, py = layer.position
     return f"\\node[{','.join(opts)}] at ({_number(px)},{_number(py)}) {{{text}}};"
 

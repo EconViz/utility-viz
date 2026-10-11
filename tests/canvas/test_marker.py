@@ -1,5 +1,8 @@
 """Marker values are preserved in MosaicKit marker layers and exports."""
 
+import shutil
+import subprocess
+
 import pytest
 from mosaickit import MarkerLayer
 
@@ -71,6 +74,27 @@ def test_marker_shape_reaches_tikz(tmp_path):
     Canvas().add_point(5, 5, marker=Marker(shape="s")).save(square)
     assert " circle " in circle.read_text(encoding="utf-8")
     assert " rectangle " in square.read_text(encoding="utf-8")
+
+
+@pytest.mark.skipif(shutil.which("pdflatex") is None, reason="pdflatex is not installed")
+def test_all_marker_shapes_compile_in_tikz(tmp_path):
+    output = tmp_path / "markers.tex"
+    canvas = Canvas(x_max=20, y_max=10)
+    for index, shape in enumerate(
+        ("o", "s", "^", "v", "<", ">", "D", "d", "*", "+", "x", ".", ",", "p", "h", "H", "|", "_"), 1
+    ):
+        canvas.add_point(index, 5, marker=Marker(shape=shape))
+    canvas.save(output)
+
+    result = subprocess.run(
+        ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", output.name],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout[-2000:]
 
 
 def test_marker_is_exported():
