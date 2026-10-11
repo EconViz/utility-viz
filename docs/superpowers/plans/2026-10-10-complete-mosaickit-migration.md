@@ -39,10 +39,10 @@
 **Interfaces:**
 - Produces: `to_mosaic_stroke`, `to_mosaic_fill`, `to_mosaic_marker`, `to_mosaic_text`, and `to_mosaic_theme`.
 
-- [ ] Add failing tests that ban Matplotlib across the package and pin every public style conversion.
-- [ ] Run the focused tests and verify failures identify current Matplotlib modules/missing converters.
-- [ ] Implement style and theme conversion without importing rendering backends.
-- [ ] Run focused scene/style tests and commit the green slice.
+- [x] Add failing tests that ban Matplotlib across the package and pin every public style conversion.
+- [x] Run the focused tests and verify failures identify current Matplotlib modules/missing converters.
+- [x] Implement style and theme conversion without importing rendering backends.
+- [x] Run focused scene/style tests and commit the green slice.
 
 ### Task 2: Replace the public Canvas and basic diagram operations
 
@@ -57,10 +57,10 @@
 **Interfaces:**
 - Produces: `Canvas(MosaicCanvas)` with `add_utility`, `add_budget`, `add_equilibrium`, `add_point`, `add_path`, `show_legend`, `show`, and `save`.
 
-- [ ] Add failing public-Canvas identity and scene-content tests.
-- [ ] Verify they fail because the root Canvas is still Matplotlib-backed.
-- [ ] Implement the MosaicKit Canvas facade and basic operations using scene factories.
-- [ ] Run all canvas, scene, public API, and compatibility tests; commit the green slice.
+- [x] Add failing public-Canvas identity and scene-content tests.
+- [x] Verify they fail because the root Canvas is still Matplotlib-backed.
+- [x] Implement the MosaicKit Canvas facade and basic operations using scene factories.
+- [x] Run all canvas, scene, public API, and compatibility tests; commit the green slice.
 
 ### Task 3: Move Figure, export, animation, and widgets to MosaicKit
 
@@ -74,9 +74,9 @@
 **Interfaces:**
 - Produces: Figure backed by `CanvasGrid`; animation backed by MosaicKit parameters/animation; `save_figure` dispatching Canvas/Grid or TikZ scene export.
 
-- [ ] Add failing tests asserting no renderer objects are retained and all formats use scene snapshots.
-- [ ] Implement grid, output, animation, and widget adapters one behavior at a time.
-- [ ] Run focused tests and commit the green slice.
+- [x] Add failing tests asserting no renderer objects are retained and all formats use scene snapshots.
+- [x] Implement grid, output, animation, and widget adapters one behavior at a time.
+- [x] Run focused tests and commit the green slice.
 
 ### Task 4: Migrate decomposition and consumer diagrams
 
@@ -89,10 +89,10 @@
 **Interfaces:**
 - Produces: MosaicKit layers for price decomposition, demand paths, Edgeworth frames, indifference pairs, contract/core/price lines, endowment, and Walrasian equilibrium.
 
-- [ ] Add failing scene-structure and numerical-coordinate tests for each diagram family.
-- [ ] Implement factories incrementally, retaining Bezier models on curved paths.
-- [ ] Switch public callers and remove each dead legacy renderer after its tests pass.
-- [ ] Run consumer and full canvas suites; commit the green slice.
+- [x] Add failing scene-structure and numerical-coordinate tests for each diagram family.
+- [x] Implement factories incrementally, retaining Bezier models on curved paths.
+- [x] Switch public callers and remove each dead legacy renderer after its tests pass.
+- [x] Run consumer and full canvas suites; commit the green slice.
 
 ### Task 5: Remove the legacy drawing stack and direct dependency
 
@@ -104,9 +104,8 @@
 **Interfaces:**
 - Produces: a single public scene pipeline with no utility-viz-owned backend code.
 
-- [ ] Tighten the architecture test to reject Matplotlib anywhere in production code and verify it fails before deletion.
-- [ ] Remove dead imports/modules and the direct dependency; update lockfile and documentation.
-- [ ] Build both `utility-viz` and the `econ-viz` shim and inspect wheel contents/metadata.
-- [ ] Run pytest, Ruff, mypy, package builds, and public render smoke tests.
-- [ ] Commit the completed migration.
-
+- [x] Tighten the architecture test to reject Matplotlib anywhere in production code and verify it fails before deletion.
+- [x] Remove dead imports/modules and the direct dependency; update lockfile and documentation.
+- [x] Build both `utility-viz` and the `econ-viz` shim and inspect wheel contents/metadata.
+- [x] Run pytest, Ruff, mypy, package builds, and public render smoke tests.
+- [x] Commit the completed migration.
