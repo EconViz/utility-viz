@@ -135,12 +135,15 @@ class Figure:
         if not self.title or self.title_style.visible is False:
             return
         _, cols = shape
-        spec = next(spec for spec in self._specs if spec.row == 0)
+        center_column = cols / 2
+        spec = next(
+            spec for spec in self._specs if spec.row == 0 and spec.col <= center_column <= spec.col + spec.colspan
+        )
         canvas = self._grid_lookup[spec.row, spec.col]
-        global_midpoint = cols * canvas.x_max / 2
+        local_midpoint = (center_column - spec.col) / spec.colspan * canvas.x_max
         canvas.add(
             TextLayer(
-                (global_midpoint - spec.col * canvas.x_max, canvas.y_max),
+                (local_midpoint, canvas.y_max),
                 self.title,
                 id="figure.title",
                 role="title",

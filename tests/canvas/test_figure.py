@@ -106,6 +106,19 @@ class TestFigure:
         assert r"\hspace{1em}" in source
         assert "% row 2 of 2" in source
 
+    @pytest.mark.parametrize(
+        "layout,panel_index,x",
+        [
+            (Layout.SIDE_BY_SIDE, 0, 10.0),
+            (Layout.TOP_ONE_BOTTOM_TWO, 0, 5.0),
+            (Layout.GRID_3X3, 1, 5.0),
+        ],
+    )
+    def test_title_is_centered_across_grid_columns(self, layout, panel_index, x):
+        fig = Figure(layout, title="Welfare")
+        title = next(layer for layer in fig[panel_index].snapshot().layers if layer.id == "figure.title")
+        assert title.position == (x, 10.0)
+
     def test_non_default_grid_spacing_fails_instead_of_becoming_a_noop(self):
         with pytest.raises(InvalidParameterError, match="hspace/wspace"):
             Figure(Layout.SINGLE, hspace=0.5)
