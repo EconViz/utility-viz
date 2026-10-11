@@ -131,7 +131,11 @@ class EdgeworthBox(IndifferenceMixin, MosaicCanvas):
         path = Path(target)
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.suffix.lower() == ".tex":
-            path.write_text(canvas_to_tikz(self), encoding="utf-8")
+            standalone = bool(options.pop("tikz_standalone", True))
+            if options:
+                names = ", ".join(sorted(options))
+                raise TypeError(f"unsupported TikZ export options: {names}")
+            path.write_text(canvas_to_tikz(self, standalone=standalone), encoding="utf-8")
             return [path]
         return super().save(path, **options)
 

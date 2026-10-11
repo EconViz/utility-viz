@@ -58,5 +58,9 @@ def test_curve_and_effect_opacity():
 
 def test_opacity_reaches_tikz(tmp_path):
     output = tmp_path / "opacity.tex"
-    Canvas().add_budget(2, 3, 30, stroke=Stroke(opacity=0.4)).save(output)
-    assert "opacity=0.4" in output.read_text(encoding="utf-8")
+    Canvas().add_budget(2, 3, 30, stroke=Stroke(opacity=0.4)).add_point(1, 1, label=Label(text="A", opacity=0.35)).save(
+        output
+    )
+    source = output.read_text(encoding="utf-8")
+    assert "opacity=0.4" in source
+    assert "text opacity=0.35" in source

@@ -21,6 +21,9 @@ def decomposition_layers(
     bundle_text_visible: bool = True,
     substitution_stroke: Stroke | None = None,
     income_stroke: Stroke | None = None,
+    projection_stroke: Stroke | None = None,
+    guide_stroke: Stroke | None = None,
+    range_strokes: tuple[Stroke | None, Stroke | None] = (None, None),
     substitution_label: tuple[str | None, TextStyle | None, tuple[float, float], str, bool] = (
         None,
         None,
@@ -95,14 +98,36 @@ def decomposition_layers(
     )
     if show_x_projections:
         layers.extend(
-            _projected_effect_layers(effects, points, y_max, range_y, substitution_label, income_label, label_effects)
+            _projected_effect_layers(
+                effects,
+                points,
+                y_max,
+                range_y,
+                substitution_label,
+                income_label,
+                label_effects,
+                projection_stroke,
+                guide_stroke,
+                range_strokes,
+            )
         )
     else:
         layers.extend(_direct_effect_layers(effects, substitution_label, income_label, label_effects))
     return tuple(layers)
 
 
-def _projected_effect_layers(effects, points, y_max, range_y, substitution_label, income_label, label_effects):
+def _projected_effect_layers(
+    effects,
+    points,
+    y_max,
+    range_y,
+    substitution_label,
+    income_label,
+    label_effects,
+    projection_stroke,
+    guide_stroke,
+    range_strokes,
+):
     layers: list[Layer] = []
     range_ys = (
         range_y[0] * y_max if range_y[0] is not None else -0.10 * y_max,
@@ -111,21 +136,32 @@ def _projected_effect_layers(effects, points, y_max, range_y, substitution_label
     for name, point in zip(("A", "B", "C"), points, strict=True):
         layers.append(
             PathLayer(
-                (point, (point[0], min(range_ys))),
+                (point, (point[0], 0.0)),
+                stroke=projection_stroke,
                 id=f"decomposition.projection.{name}",
                 role="utility.decomposition.projection",
+                z_index=3,
+            )
+        )
+        layers.append(
+            PathLayer(
+                ((point[0], 0.0), (point[0], min(range_ys))),
+                stroke=guide_stroke,
+                id=f"decomposition.guide.{name}",
+                role="utility.decomposition.guide",
                 clip=False,
                 z_index=3,
             )
         )
-    for effect, y, label in zip(effects, range_ys, (substitution_label, income_label), strict=True):
-        name, start, end, delta, stroke = effect
+    labels = (substitution_label, income_label)
+    for effect, y, label, range_stroke in zip(effects, range_ys, labels, range_strokes, strict=True):
+        name, start, end, delta, _ = effect
         if abs(end[0] - start[0]) <= 1e-3:
             continue
         layers.append(
             PathLayer(
                 ((start[0], y), (end[0], y)),
-                stroke=stroke,
+                stroke=range_stroke,
                 arrow_placement=ArrowPlacement.END,
                 clip=False,
                 id=f"decomposition.range.{name}",

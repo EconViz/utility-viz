@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from utility_viz.core.constants.canvas import MATH_CHARS
-from utility_viz.core.rendering.labels import HAlign, VAlign
+from utility_viz.core.styles.placement import HAlign, VAlign
 from utility_viz.core.styles.stroke import Stroke
 from utility_viz.enums import ArrowStyle, LabelPosition, LineStyle
 

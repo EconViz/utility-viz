@@ -33,6 +33,18 @@ _DASH = {"solid": "", "dashed": "dashed", "dotted": "dotted", "dashdot": "dash d
 _HORIZONTAL = {"left": "west", "right": "east", "center": ""}
 _VERTICAL = {"top": "north", "bottom": "south", "center": ""}
 _ESCAPES = {"\\": r"\textbackslash{}", "&": r"\&", "%": r"\%", "#": r"\#", "_": r"\_", "{": r"\{", "}": r"\}"}
+_ARROW_TIPS = {
+    "open": "Latex[open,length=5pt]",
+    "triangle": "Triangle[length=5pt]",
+    "fancy": "Stealth[length=5pt]",
+    "wedge": "Kite[length=5pt]",
+}
+_FONT_COMMANDS = {
+    "serif": r"\rmfamily",
+    "sans": r"\sffamily",
+    "sans-serif": r"\sffamily",
+    "monospace": r"\ttfamily",
+}
 
 
 class _Colors:
@@ -65,7 +77,7 @@ def _stroke_options(stroke: Stroke, placement: ArrowPlacement, colors: _Colors) 
     if stroke.opacity is not None and stroke.opacity < 1:
         opts.append(f"opacity={_number(stroke.opacity)}")
     if stroke.arrow is not None:
-        tip = "{Stealth[length=5pt]}"
+        tip = "{" + _ARROW_TIPS[stroke.arrow.value] + "}"
         opts.append(
             {
                 ArrowPlacement.END: f"-{tip}",
@@ -148,17 +160,73 @@ def _text_command(layer: TextLayer, bundle: Any, colors: _Colors) -> str:
     horizontal, vertical = TEXT_ANCHORS[layer.anchor]
     anchor = " ".join(part for part in (_VERTICAL[vertical], _HORIZONTAL[horizontal]) if part)
     size = float(style.size or 12)
+    font = f"\\fontsize{{{_number(size)}}}{{{_number(size * 1.2)}}}\\selectfont"
+    family = _FONT_COMMANDS.get((style.family or "").lower())
+    if family:
+        font += family
     opts = [
         f"text={colors.name(style.color)}",  # type: ignore[arg-type]
-        f"font=\\fontsize{{{_number(size)}}}{{{_number(size * 1.2)}}}\\selectfont",
+        f"font={{{font}}}",
         f"xshift={_number(layer.offset[0])}pt",
         f"yshift={_number(layer.offset[1])}pt",
     ]
+    if style.opacity is not None and style.opacity < 1:
+        opts.append(f"text opacity={_number(style.opacity)}")
     if anchor:
         opts.insert(0, f"anchor={anchor}")
     text = f"${layer.text}$" if layer.math else "".join(_ESCAPES.get(c, c) for c in str(layer.text))
     px, py = layer.position
     return f"\\node[{','.join(opts)}] at ({_number(px)},{_number(py)}) {{{text}}};"
+
+
+def _background_command(canvas: Canvas, colors: _Colors) -> str | None:
+    fill = canvas.theme.resolve("canvas", fallback_category="fill").fill
+    if fill is None or fill.opacity == 0:
+        return None
+    spec = canvas.spec
+    opts = [f"fill={colors.name(fill.color)}"]  # type: ignore[arg-type]
+    if fill.opacity is not None and fill.opacity < 1:
+        opts.append(f"fill opacity={_number(fill.opacity)}")
+    return (
+        f"\\path[{','.join(opts)}] ({_number(spec.x_min)},{_number(spec.y_min)}) rectangle "
+        f"({_number(spec.x_max)},{_number(spec.y_max)});"
+    )
+
+
+def _legend_command(
+    layer: LegendLayer, entries: tuple[str, ...], bundle: Any, canvas: Canvas, colors: _Colors
+) -> str | None:
+    style = layer.style.merged_over(bundle.legend) if layer.style and bundle.legend else bundle.legend
+    if style is None or style.visible is False or not entries:
+        return None
+    spec = canvas.spec
+    location = style.location or "best"
+    positions = {
+        "best": ((spec.x_max, spec.y_max), "north east"),
+        "upper right": ((spec.x_max, spec.y_max), "north east"),
+        "upper left": ((spec.x_min, spec.y_max), "north west"),
+        "upper center": (((spec.x_min + spec.x_max) / 2, spec.y_max), "south"),
+        "lower left": ((spec.x_min, spec.y_min), "south west"),
+        "lower right": ((spec.x_max, spec.y_min), "south east"),
+        "lower center": (((spec.x_min + spec.x_max) / 2, spec.y_min), "north"),
+        "center left": ((spec.x_min, (spec.y_min + spec.y_max) / 2), "east"),
+        "center right": ((spec.x_max, (spec.y_min + spec.y_max) / 2), "west"),
+        "top": (((spec.x_min + spec.x_max) / 2, spec.y_max), "south"),
+        "bottom": (((spec.x_min + spec.x_max) / 2, spec.y_min), "north"),
+        "left": ((spec.x_min, (spec.y_min + spec.y_max) / 2), "east"),
+        "right": ((spec.x_max, (spec.y_min + spec.y_max) / 2), "west"),
+    }
+    position, anchor = positions.get(location, positions["best"])
+    text_style = bundle.text
+    opts = [f"anchor={anchor}", "align=left", "inner sep=3pt"]
+    if style.frame:
+        opts.append("draw")
+    if text_style is not None and text_style.color is not None:
+        opts.append(f"text={colors.name(text_style.color)}")
+    size = float(style.size or (text_style.size if text_style else 10) or 10)
+    opts.append(f"font={{\\fontsize{{{_number(size)}}}{{{_number(size * 1.2)}}}\\selectfont}}")
+    content = r" \\ ".join("".join(_ESCAPES.get(c, c) for c in entry) for entry in entries)
+    return f"\\node[{','.join(opts)}] at ({_number(position[0])},{_number(position[1])}) {{{content}}};"
 
 
 def _layer_commands(layer: Layer, bundle: Any, colors: _Colors, clip: str) -> list[str]:
@@ -185,13 +253,22 @@ def canvas_to_tikz(canvas: Canvas, *, standalone: bool = True) -> str:
     colors = _Colors(canvas.config.palette)
     x0, x1, y0, y1 = spec.x_min, spec.x_max, spec.y_min, spec.y_max
     clip = f"\\clip ({_number(x0)},{_number(y0)}) rectangle ({_number(x1)},{_number(y1)});"
-    body: list[str] = []
+    background = _background_command(canvas, colors)
+    body: list[str] = [background] if background else []
+    ordered_layers = canvas.snapshot().ordered_layers
+    legend_entries = tuple(dict.fromkeys(layer.legend for layer in ordered_layers if layer.visible and layer.legend))
 
-    for layer in canvas.snapshot().ordered_layers:
+    for layer in ordered_layers:
         if not layer.visible:
             continue
         bundle = canvas.theme.resolve(layer.role, fallback_category=layer.fallback_category)
-        body.extend(_layer_commands(layer, bundle, colors, clip))
+        if isinstance(layer, LegendLayer):
+            entries = layer.entries or legend_entries
+            command = _legend_command(layer, entries, bundle, canvas, colors)
+            if command:
+                body.append(command)
+        else:
+            body.extend(_layer_commands(layer, bundle, colors, clip))
 
     defs = "\n".join(f"\\definecolor{{{name}}}{{HTML}}{{{value}}}" for name, value in sorted(colors.defined.items()))
     picture = (

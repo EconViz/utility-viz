@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING
 
 from utility_viz.core.diagrams.consumer.edgeworth.exchange import check_allocation, locate_walrasian
 from utility_viz.core.diagrams.consumer.edgeworth.methods.lines import LinesMixin
-from utility_viz.core.rendering.labels import placement
 from utility_viz.core.scenes.consumer.edgeworth import edgeworth_point_layers
 from utility_viz.core.scenes.styles import to_mosaic_marker, to_mosaic_text
 from utility_viz.core.styles.label import Label, split_label
 from utility_viz.core.styles.marker import Marker
+from utility_viz.core.styles.placement import placement
 from utility_viz.core.styles.stroke import Stroke
 from utility_viz.enums import LabelPosition
 

@@ -14,6 +14,7 @@ from utility_viz.core.canvas.layers import LayerMixin
 from utility_viz.core.config.settings import Config
 from utility_viz.core.constants.canvas import DEFAULT_DPI, MAX_DPI, MIN_DPI
 from utility_viz.core.errors.exceptions import InvalidParameterError
+from utility_viz.core.scenes.fonts import resolve_font, resolve_math_font
 from utility_viz.core.scenes.styles import to_mosaic_stroke, to_mosaic_text, to_mosaic_theme
 from utility_viz.core.scenes.tikz import canvas_to_tikz
 from utility_viz.core.styles.axis import Axis
@@ -70,11 +71,10 @@ class Canvas(LayerMixin, MosaicCanvas):
         active = Config.active()
         legacy_theme = theme if theme is not None else active.theme
         selected_font = font if font is not None else active.font
-        if isinstance(selected_font, Sequence) and not isinstance(selected_font, str):
-            selected_font = next(iter(selected_font), None)
+        self.font_families, selected_font = resolve_font(selected_font)
+        self.math_font, self.math_family = resolve_math_font(math_font if math_font is not None else active.math_font)
         self.legacy_theme = legacy_theme
         self.font = selected_font
-        self.math_font = math_font if math_font is not None else active.math_font
 
         x_axis, y_axis = x_axis or Axis(), y_axis or Axis()
         x_text, self.x_label_style = split_label(x_axis.label, legacy_theme.axis_label)
@@ -161,7 +161,7 @@ class Canvas(LayerMixin, MosaicCanvas):
                     self.x_label,
                     id="axes.x.label",
                     role="axes",
-                    style=to_mosaic_text(self.x_label_style, family=self.font),
+                    style=to_mosaic_text(self.x_label_style, family=self.math_family or self.font),
                     offset=x_offset,
                     anchor=x_anchor,
                     math=True,
@@ -174,7 +174,7 @@ class Canvas(LayerMixin, MosaicCanvas):
                     self.y_label,
                     id="axes.y.label",
                     role="axes",
-                    style=to_mosaic_text(self.y_label_style, family=self.font),
+                    style=to_mosaic_text(self.y_label_style, family=self.math_family or self.font),
                     offset=y_offset,
                     anchor=y_anchor,
                     math=True,
@@ -229,6 +229,9 @@ class Canvas(LayerMixin, MosaicCanvas):
         if path.suffix.lower() == ".tex":
             path.parent.mkdir(parents=True, exist_ok=True)
             standalone = bool(options.pop("tikz_standalone", True))
+            if options:
+                names = ", ".join(sorted(options))
+                raise TypeError(f"unsupported TikZ export options: {names}")
             path.write_text(canvas_to_tikz(self, standalone=standalone), encoding="utf-8")
             return [path]
         path.parent.mkdir(parents=True, exist_ok=True)

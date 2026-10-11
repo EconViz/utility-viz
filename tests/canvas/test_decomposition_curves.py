@@ -93,6 +93,22 @@ def test_x_projection_mode_draws_guides_and_horizontal_ranges():
     assert len(_layers(canvas, "decomposition.projection.")) == 3
 
 
+def test_projection_guide_and_range_strokes_remain_distinct():
+    canvas = Canvas(x_max=40, y_max=27).add_decomposition(
+        _dec("hicks"),
+        show_x_projections=True,
+        projection_stroke=Stroke(color="red", width=1),
+        guide_stroke=Stroke(color="blue", width=2),
+        range_stroke=Stroke(color="green", width=3),
+    )
+    projection = _layers(canvas, "decomposition.projection.")[0]
+    guide = _layers(canvas, "decomposition.guide.")[0]
+    ranges = [layer for layer in _layers(canvas, "decomposition.range.") if isinstance(layer, PathLayer)]
+    assert projection.stroke.color.to_hex() == "#FF0000" and projection.stroke.width == 1
+    assert guide.stroke.color.to_hex() == "#0000FF" and guide.stroke.width == 2
+    assert all(layer.stroke.color.to_hex() == "#008000" and layer.stroke.width == 3 for layer in ranges)
+
+
 def test_zero_effect_draws_no_range_arrow():
     import numpy as np
 

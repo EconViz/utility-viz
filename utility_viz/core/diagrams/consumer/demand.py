@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+from mosaickit import TextLayer
+
 from utility_viz.core.canvas.base import Canvas
 from utility_viz.core.layout.figure import Figure
 from utility_viz.core.scenes.consumer.demand import demand_marker_layers, marshallian_demand_layers
-from utility_viz.core.scenes.styles import to_mosaic_marker, to_mosaic_stroke
+from utility_viz.core.scenes.styles import to_mosaic_marker, to_mosaic_stroke, to_mosaic_text
 from utility_viz.core.styles.axis import Axis
-from utility_viz.core.styles.label import Label
+from utility_viz.core.styles.label import Label, split_label
 from utility_viz.core.styles.legend import Legend
 from utility_viz.core.styles.marker import Marker
+from utility_viz.core.styles.placement import placement
 from utility_viz.core.styles.stroke import Stroke
-from utility_viz.enums import Layout, LineStyle
+from utility_viz.enums import LabelPosition, Layout, LineStyle
 from utility_viz.models.consumer.paths import LinearBudget, PricePath, QuantityAxis
 from utility_viz.models.optimization import solve
 from utility_viz.models.optimization.solver import Equilibrium
@@ -98,12 +101,15 @@ class DemandDiagram(Figure):
         quantity_axis = self._quantity_axis()
         for index, (price, (budget, equilibrium)) in enumerate(zip(markers, solved, strict=True)):
             label = chr(ord("A") + index)
+            selected_budget = (budget_stroke or Stroke()).merged_over(self.utility_canvas.legacy_theme.budget_stroke)
+            if index > 0 and (budget_stroke is None or budget_stroke.style is None):
+                selected_budget = Stroke(style=LineStyle.DASHED).merged_over(selected_budget)
             self.utility_canvas.add_budget(
                 budget.px,
                 budget.py,
                 budget.income,
                 label=rf"{label}: {_PRICE_SYMBOL[self.path.parameter_name]}={price:.2g}",
-                stroke=budget_stroke,
+                stroke=selected_budget,
             )
             self.utility_canvas.add_equilibrium(
                 equilibrium,
@@ -140,13 +146,8 @@ class DemandDiagram(Figure):
             if show_demand_guides
             else demand_marker_layers(demand_points, marker=to_mosaic_marker(selected_marker))[-1:]
         )
-        for index, (quantity, price) in enumerate(demand_points):
-            self.demand_canvas.add_point(
-                quantity,
-                price,
-                label=chr(ord("A") + index) if point_label is None else point_label,
-                marker=point_marker,
-            )
+        for index, point in enumerate(demand_points):
+            _add_demand_label(self.demand_canvas, point, chr(ord("A") + index), point_label, selected_marker)
         if show_legend:
             self.utility_canvas.show_legend(legend)
             self.demand_canvas.show_legend(legend)
@@ -172,3 +173,30 @@ class DemandDiagram(Figure):
     def _solve_at_parameter(self, value: float) -> tuple[LinearBudget, Equilibrium]:
         budget = self.path.base_budget.with_update(**{self.path.parameter_name: value})
         return budget, solve(self.func, px=budget.px, py=budget.py, income=budget.income)
+
+
+def _add_demand_label(canvas: Canvas, point, fallback_text: str, label: Label | None, marker: Marker) -> None:
+    text, style = split_label(
+        label if label is not None else fallback_text, canvas.legacy_theme.point_label, fallback_text
+    )
+    if not text:
+        return
+    if style.color is None and marker.color is not None:
+        style = Label(color=marker.color).merged_over(style)
+    position = LabelPosition(style.position or LabelPosition.TOP_RIGHT)
+    offset, horizontal, vertical = placement(position, style.offset or 5)
+    anchor = "-".join(part for part in (vertical, horizontal) if part != "center") or "center"
+    canvas.add(
+        TextLayer(
+            point,
+            text,
+            id=f"demand.point.{fallback_text}.label",
+            role="utility.demand.point",
+            style=to_mosaic_text(style, family=canvas.math_family or canvas.font),
+            offset=offset,
+            anchor=anchor,
+            math=True,
+            visible=style.visible is not False,
+            z_index=7,
+        )
+    )

@@ -34,7 +34,7 @@ _ATTR_EXPORTS = {
     "Label": ("utility_viz.core.styles.label", "Label"),
     "Legend": ("utility_viz.core.styles.legend", "Legend"),
     "Marker": ("utility_viz.core.styles.marker", "Marker"),
-    "Effect": ("utility_viz.core.rendering.effect", "Effect"),
+    "Effect": ("utility_viz.core.styles.effect", "Effect"),
     "UtilityVizError": ("utility_viz.core.errors.exceptions", "UtilityVizError"),
     "EconVizError": ("utility_viz.core.errors.exceptions", "EconVizError"),
     "UtilityVizDeprecationWarning": ("utility_viz.core.errors.deprecation", "UtilityVizDeprecationWarning"),

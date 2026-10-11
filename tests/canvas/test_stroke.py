@@ -87,13 +87,21 @@ def test_kink_rays_and_decomposition_strokes():
         _assert_stroke(_paths(canvas, name)[0])
 
 
-@pytest.mark.parametrize("arrow", list(ArrowStyle))
-def test_arrow_styles_reach_mosaickit_and_tikz(arrow, tmp_path):
+@pytest.mark.parametrize(
+    "arrow,tikz_tip",
+    [
+        (ArrowStyle.SIMPLE, "Latex[open"),
+        (ArrowStyle.TRIANGLE, "Triangle["),
+        (ArrowStyle.FANCY, "Stealth["),
+        (ArrowStyle.WEDGE, "Kite["),
+    ],
+)
+def test_arrow_styles_reach_mosaickit_and_tikz(arrow, tikz_tip, tmp_path):
     canvas = Canvas().add_budget(2, 3, 30, stroke=Stroke(arrow=arrow))
     assert _paths(canvas, "budget")[0].stroke.arrow is not None
     output = tmp_path / f"{arrow.name}.tex"
     canvas.save(output)
-    assert "Stealth" in output.read_text(encoding="utf-8")
+    assert tikz_tip in output.read_text(encoding="utf-8")
 
 
 def test_no_arrow_by_default():

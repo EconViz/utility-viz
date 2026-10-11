@@ -7,7 +7,7 @@ Dependency direction (a unit may import only from a strictly lower layer)::
     core.styles, models.utility               layer 2
     core.themes, core.export,
         models.optimization, models.curves    layer 3
-    core.config, core.rendering,
+    core.config,
         models.analysis, models.consumer      layer 4
     core.scenes                               layer 5
     core.diagrams.components                  layer 6
@@ -41,7 +41,6 @@ LAYERS: dict[str, int] = {
     "models.optimization": 3,
     "models.curves": 3,
     "core.config": 4,
-    "core.rendering": 4,
     "models.analysis": 4,
     "models.consumer": 4,
     "core.scenes": 5,
@@ -212,7 +211,6 @@ _SCENE_FORBIDDEN = (
     "utility_viz.core.canvas",
     "utility_viz.core.themes",
     "utility_viz.core.export",
-    "utility_viz.core.rendering",
 )
 
 

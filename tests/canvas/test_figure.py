@@ -1,9 +1,12 @@
 """Tests for multi-panel figures, paths, and linked demand diagrams."""
 
+import shutil
+import subprocess
+
 import numpy as np
 import pytest
 from bezierkit import PiecewiseBezier
-from mosaickit import FillLayer, LegendLayer, MarkerLayer, PathLayer
+from mosaickit import FillLayer, LegendLayer, MarkerLayer, PathLayer, TextLayer
 
 from utility_viz import (
     ArrowStyle,
@@ -16,6 +19,7 @@ from utility_viz import (
     LinearBudget,
     PricePath,
 )
+from utility_viz.core.errors.exceptions import InvalidParameterError
 from utility_viz.models.utility import CES, CobbDouglas, Leontief, PerfectSubstitutes, QuasiLinear, StoneGeary
 
 
@@ -89,6 +93,40 @@ class TestFigure:
         Figure(Layout.SINGLE).save(str(out))
         assert out.exists()
         assert r"\begin{tikzpicture}" in out.read_text(encoding="utf-8")
+
+    def test_title_is_a_scene_layer_and_tikz_preserves_layout(self, tmp_path):
+        out = tmp_path / "multi.tex"
+        fig = Figure(Layout.TOP_TWO_BOTTOM_ONE, title="Welfare")
+        titles = [layer for canvas in fig.canvases for layer in canvas.snapshot().layers if layer.id == "figure.title"]
+        assert len(titles) == 1 and isinstance(titles[0], TextLayer)
+        fig.save(out)
+        source = out.read_text(encoding="utf-8")
+        assert source.count(r"\begin{tikzpicture}") == 3
+        assert r"\begin{center}" in source
+        assert r"\hspace{1em}" in source
+        assert "% row 2 of 2" in source
+
+    def test_non_default_grid_spacing_fails_instead_of_becoming_a_noop(self):
+        with pytest.raises(InvalidParameterError, match="hspace/wspace"):
+            Figure(Layout.SINGLE, hspace=0.5)
+
+    def test_tikz_rejects_unknown_renderer_options(self, tmp_path):
+        with pytest.raises(TypeError, match="unsupported TikZ"):
+            Figure(Layout.SINGLE).save(tmp_path / "bad.tex", transparent=True)
+
+    @pytest.mark.skipif(shutil.which("pdflatex") is None, reason="pdflatex is not installed")
+    def test_multi_panel_tikz_compiles(self, tmp_path):
+        target = tmp_path / "multi.tex"
+        Figure(Layout.TOP_TWO_BOTTOM_ONE, title="Welfare").save(target)
+        result = subprocess.run(
+            ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", target.name],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert result.returncode == 0, result.stdout[-2000:]
+        assert (tmp_path / "multi.pdf").stat().st_size > 0
 
 
 class TestConsumptionPaths:
@@ -228,6 +266,39 @@ class TestDemandDiagram:
         guides = [layer for layer in fig.demand_canvas.snapshot().layers if layer.id.startswith("demand.guide.")]
         assert len(guides) == 4
         assert all(isinstance(layer, PathLayer) for layer in guides)
+
+    def test_selected_demand_points_are_emitted_once_and_labeled(self):
+        path = PricePath(
+            CobbDouglas(),
+            budget=LinearBudget(px=2.0, py=2.0, income=40.0),
+            price="px",
+            price_range=(1.0, 4.0),
+            n=20,
+        )
+        fig = DemandDiagram(path).add_marshallian_panel(price_markers=[2.0, 4.0])
+        markers = [layer for layer in fig.demand_canvas.snapshot().layers if isinstance(layer, MarkerLayer)]
+        assert [layer.id for layer in markers].count("demand.points") == 1
+        assert sum(len(layer.points) for layer in markers if layer.id == "demand.points") == 2
+        assert {layer.text for layer in fig.demand_canvas.snapshot().layers if layer.id.endswith(".label")} >= {
+            "A",
+            "B",
+        }
+
+    def test_selected_budgets_use_solid_then_dashed_styles(self):
+        path = PricePath(
+            CobbDouglas(),
+            budget=LinearBudget(px=2.0, py=2.0, income=40.0),
+            price="px",
+            price_range=(1.0, 4.0),
+            n=20,
+        )
+        fig = DemandDiagram(path).add_marshallian_panel(price_markers=[2.0, 4.0])
+        budgets = [
+            layer
+            for layer in fig.utility_canvas.snapshot().ordered_layers
+            if isinstance(layer, PathLayer) and layer.id.startswith("budget")
+        ]
+        assert [layer.stroke.dash.value for layer in budgets] == ["solid", "dashed"]
 
     def test_perfect_substitutes_demand_breaks_at_tie(self):
         path = PricePath(

@@ -7,7 +7,7 @@ from utility_viz import ArrowStyle, Canvas, LabelPosition, LineStyle
 from utility_viz.core.diagrams.components import BudgetConstraint, EquilibriumPoint, IndifferenceCurves, draw_ray
 from utility_viz.core.errors.exceptions import InvalidParameterError
 from utility_viz.models.optimization import decompose_price_effect, solve
-from utility_viz.models.utility import CobbDouglas
+from utility_viz.models.utility import CobbDouglas, Leontief
 
 MODEL = CobbDouglas()
 
@@ -87,6 +87,41 @@ def test_public_components_append_mosaickit_layers():
     assert all(isinstance(layer, (PathLayer, FillLayer, MarkerLayer, TextLayer)) for layer in canvas.snapshot().layers)
 
 
+def test_public_indifference_component_preserves_decorations_and_secondary_style():
+    canvas = Canvas(x_max=10, y_max=10)
+    IndifferenceCurves(
+        Leontief(1, 1),
+        levels=[2, 4],
+        color="blue",
+        linewidth=2,
+        show_rays=True,
+        ray_color="red",
+        show_kinks=True,
+        kink_color="black",
+        highlight_level=4,
+        secondary_color="gray",
+        secondary_opacity=0.2,
+    ).draw(canvas, 10, 10)
+
+    layers = canvas.snapshot().layers
+    assert any(layer.id.endswith(".kinks") for layer in layers)
+    assert any(isinstance(layer, PathLayer) and layer.id.startswith("ray") for layer in layers)
+    secondary = next(layer for layer in layers if layer.role == "utility.indifference.secondary")
+    assert secondary.stroke.opacity == 0.2
+
+    component = IndifferenceCurves(
+        Leontief(1, 1),
+        levels=[2],
+        color="blue",
+        linewidth=2,
+        show_rays=True,
+        show_kinks=True,
+    )
+    standalone_layers, _ = component.layers(10, 10)
+    assert any(layer.id == "utility.kinks" for layer in standalone_layers)
+    assert any(layer.id.startswith("utility.ray.") for layer in standalone_layers)
+
+
 def test_canvas_tikz_can_write_an_embeddable_picture(tmp_path):
     output = tmp_path / "embedded.tex"
     Canvas().add_budget(2, 3, 30).save(output, tikz_standalone=False)
@@ -95,3 +130,8 @@ def test_canvas_tikz_can_write_an_embeddable_picture(tmp_path):
     assert source.startswith("\\definecolor")
     assert "\\begin{tikzpicture}" in source
     assert "\\documentclass" not in source
+
+
+def test_canvas_tikz_rejects_unknown_options(tmp_path):
+    with pytest.raises(TypeError, match="unsupported TikZ"):
+        Canvas().save(tmp_path / "bad.tex", transparent=True)

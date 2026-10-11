@@ -8,11 +8,13 @@ from pathlib import Path
 from typing import Any, Final, cast
 
 from mosaickit import Canvas as MosaicCanvas
-from mosaickit import CanvasGrid
+from mosaickit import CanvasGrid, TextLayer
 from mosaickit import Layout as MosaicLayout
 
 from utility_viz.core.canvas.base import Canvas
 from utility_viz.core.constants.canvas import DEFAULT_DPI
+from utility_viz.core.errors.exceptions import InvalidParameterError
+from utility_viz.core.scenes.styles import to_mosaic_text
 from utility_viz.core.scenes.tikz import canvas_to_tikz
 from utility_viz.core.styles.axis import Axis
 from utility_viz.core.styles.label import Label, split_label
@@ -84,6 +86,11 @@ class Figure:
         x_axis: Axis | None = None,
         y_axis: Axis | None = None,
     ) -> None:
+        if hspace != 0.3 or wspace != 0.25:
+            raise InvalidParameterError(
+                "custom hspace/wspace are unavailable in MosaicKit CanvasGrid; "
+                "use the default spacing or size panels with figsize"
+            )
         self.layout = Layout(layout)
         self.shared_x = shared_x
         self.shared_y = shared_y
@@ -121,6 +128,28 @@ class Figure:
         self._specs = specs
         self._grid_lookup = {(spec.row, spec.col): canvas for spec, canvas in zip(specs, self.canvases, strict=True)}
         self._apply_shared_axis_labels(shape)
+        self._add_figure_title(shape)
+
+    def _add_figure_title(self, shape: tuple[int, int]) -> None:
+        """Represent the figure title in the scene rather than renderer state."""
+        if not self.title or self.title_style.visible is False:
+            return
+        _, cols = shape
+        spec = next(spec for spec in self._specs if spec.row == 0)
+        canvas = self._grid_lookup[spec.row, spec.col]
+        global_midpoint = cols * canvas.x_max / 2
+        canvas.add(
+            TextLayer(
+                (global_midpoint - spec.col * canvas.x_max, canvas.y_max),
+                self.title,
+                id="figure.title",
+                role="title",
+                style=to_mosaic_text(self.title_style, family=canvas.font),
+                offset=(0, 24),
+                anchor="bottom",
+                z_index=20,
+            )
+        )
 
     def _apply_shared_axis_labels(self, shape: tuple[int, int]) -> None:
         rows, _ = shape
@@ -148,8 +177,17 @@ class Figure:
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.suffix.lower() == ".tex":
             standalone = bool(options.pop("tikz_standalone", True))
-            pictures = [canvas_to_tikz(canvas, standalone=False) for canvas in self.canvases]
-            body = "\n".join(pictures)
+            if options:
+                names = ", ".join(sorted(options))
+                raise TypeError(f"unsupported TikZ export options: {names}")
+            definitions: set[str] = set()
+            pictures: list[str] = []
+            for canvas in self.canvases:
+                source = canvas_to_tikz(canvas, standalone=False)
+                picture_at = source.index(r"\begin{tikzpicture}")
+                definitions.update(source[:picture_at].splitlines())
+                pictures.append(source[picture_at:])
+            body = "\n".join(sorted(definitions)) + "\n" + self._tikz_grid(pictures)
             if standalone:
                 body = (
                     "\\documentclass[tikz,border=12pt]{standalone}\n"
@@ -159,6 +197,26 @@ class Figure:
             path.write_text(body, encoding="utf-8")
             return [path]
         return self.grid.save(path, **options)
+
+    def _tikz_grid(self, pictures: list[str]) -> str:
+        rows, cols = _LAYOUT_SPECS[self.layout][0]
+        cells: dict[tuple[int, int], tuple[str, _PanelSpec]] = {
+            (spec.row, spec.col): (picture, spec) for spec, picture in zip(self._specs, pictures, strict=True)
+        }
+        lines = [r"\begin{center}"]
+        for row in range(rows):
+            row_cells: list[str] = []
+            col = 0
+            while col < cols:
+                picture, spec = cells[(row, col)]
+                row_cells.append(picture)
+                col += spec.colspan
+            lines.append(f"% row {row + 1} of {rows}")
+            lines.append(r"\hspace{1em}".join(row_cells))
+            if row + 1 < rows:
+                lines.append(r"\par\medskip")
+        lines.append(r"\end{center}")
+        return "\n".join(lines)
 
     def show(self) -> None:
         self.render().show()
