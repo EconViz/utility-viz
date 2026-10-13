@@ -16,7 +16,6 @@ from utility_viz.core.constants.canvas import DEFAULT_DPI, MAX_DPI, MIN_DPI
 from utility_viz.core.errors.exceptions import InvalidParameterError
 from utility_viz.core.scenes.fonts import resolve_font, resolve_math_font
 from utility_viz.core.scenes.styles import to_mosaic_stroke, to_mosaic_text, to_mosaic_theme
-from utility_viz.core.scenes.tikz import canvas_to_tikz
 from utility_viz.core.styles.axis import Axis
 from utility_viz.core.styles.label import Label, split_label
 from utility_viz.core.styles.stroke import Stroke
@@ -226,13 +225,5 @@ class Canvas(LayerMixin, MosaicCanvas):
 
     def save(self, target: str | Path, **options: Any) -> list[Path]:
         path = Path(target)
-        if path.suffix.lower() == ".tex":
-            path.parent.mkdir(parents=True, exist_ok=True)
-            standalone = bool(options.pop("tikz_standalone", True))
-            if options:
-                names = ", ".join(sorted(options))
-                raise TypeError(f"unsupported TikZ export options: {names}")
-            path.write_text(canvas_to_tikz(self, standalone=standalone), encoding="utf-8")
-            return [path]
         path.parent.mkdir(parents=True, exist_ok=True)
         return super().save(path, **options)

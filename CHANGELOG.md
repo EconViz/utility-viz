@@ -2,6 +2,16 @@
 
 <!-- version list -->
 
+## Unreleased
+
+### Changes
+
+- Delegate GIF encoding to KineticKit and whole-scene or grid TikZ export to
+  MosaicKit. UtilityViz now retains only its economic scene construction and a
+  small BezierKit path-serialization adapter.
+- Stop probing system fonts in UtilityViz; font-family hints are passed to the
+  renderer-owned compatibility path unchanged.
+
 ## v2.0.0b2 (2026-10-10)
 
 ### Breaking changes

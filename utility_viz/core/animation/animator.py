@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -16,32 +16,16 @@ if TYPE_CHECKING:
     AnyFigure = Canvas | Figure
 
 
-def _require_pillow() -> None:
+def _require_kinetickit():
     try:
-        import PIL  # noqa: F401
+        from kinetickit.exporters import export_png_frames
     except ImportError as exc:
         raise ImportError(
-            "Pillow is required for GIF export.\n"
+            "KineticKit is required for GIF export.\n"
             "Install it with:  pip install utility-viz[animation]\n"
-            "              or:  pip install Pillow"
+            "              or:  pip install 'kinetickit[raster]'"
         ) from exc
-
-
-def _saved_scene_to_pil(drawable, target: Path, dpi: int):
-    """Render through the drawable's MosaicKit save path and load an RGB frame."""
-    from PIL import Image
-
-    canvases = getattr(drawable, "canvases", (drawable,))
-    previous = []
-    for canvas in canvases:
-        previous.append(canvas.spec)
-        canvas.spec = canvas.spec.replace(dpi=dpi)
-    try:
-        drawable.save(target, transparent=False)
-        return Image.open(target).copy().convert("RGB")
-    finally:
-        for canvas, spec in zip(canvases, previous, strict=True):
-            canvas.spec = spec
+    return export_png_frames
 
 
 class Animator:
@@ -64,29 +48,24 @@ class Animator:
         dpi: int = 150,
         loop: int = 0,
     ) -> None:
-        _require_pillow()
-        images = self._render_frames(dpi=dpi)
-        self._write_gif(images, path=Path(path), fps=fps, loop=loop)
+        export_png_frames = _require_kinetickit()
+        target = Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        export_png_frames(self._render_frames(dpi=dpi), target, fps=fps, loop=loop, disposal=2)
 
-    def _render_frames(self, dpi: int) -> list:
-        images = []
+    def _render_frames(self, dpi: int) -> Iterator[bytes]:
         with TemporaryDirectory(prefix="utility-viz-animation-") as directory:
             root = Path(directory)
             for index, value in enumerate(self._frames):
                 drawable = self._factory(float(value))
-                images.append(_saved_scene_to_pil(drawable, root / f"frame-{index:06d}.png", dpi))
-        return images
-
-    @staticmethod
-    def _write_gif(images: list, path: Path, fps: int, loop: int) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        duration_ms = int(1000 / max(fps, 1))
-        images[0].save(
-            str(path),
-            save_all=True,
-            append_images=images[1:],
-            loop=loop,
-            duration=duration_ms,
-            optimize=False,
-            disposal=2,
-        )
+                canvases = cast("Sequence[Canvas]", getattr(drawable, "canvases", (drawable,)))
+                previous = [canvas.spec for canvas in canvases]
+                target = root / f"frame-{index:06d}.png"
+                try:
+                    for canvas in canvases:
+                        canvas.spec = canvas.spec.replace(dpi=dpi)
+                    drawable.save(target, transparent=False)
+                    yield target.read_bytes()
+                finally:
+                    for canvas, spec in zip(canvases, previous, strict=True):
+                        canvas.spec = spec

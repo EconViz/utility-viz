@@ -13,7 +13,6 @@ from utility_viz.core.constants.canvas import DEFAULT_DPI, MAX_DPI, MIN_DPI
 from utility_viz.core.diagrams.consumer.edgeworth.methods import IndifferenceMixin
 from utility_viz.core.scenes.consumer.edgeworth import edgeworth_frame_layers
 from utility_viz.core.scenes.styles import to_mosaic_stroke, to_mosaic_text, to_mosaic_theme
-from utility_viz.core.scenes.tikz import canvas_to_tikz
 from utility_viz.core.styles.axis import Axis
 from utility_viz.core.styles.label import Label
 from utility_viz.core.styles.legend import Legend
@@ -130,13 +129,6 @@ class EdgeworthBox(IndifferenceMixin, MosaicCanvas):
     def save(self, target: str | Path, **options: Any) -> list[Path]:
         path = Path(target)
         path.parent.mkdir(parents=True, exist_ok=True)
-        if path.suffix.lower() == ".tex":
-            standalone = bool(options.pop("tikz_standalone", True))
-            if options:
-                names = ", ".join(sorted(options))
-                raise TypeError(f"unsupported TikZ export options: {names}")
-            path.write_text(canvas_to_tikz(self, standalone=standalone), encoding="utf-8")
-            return [path]
         return super().save(path, **options)
 
     def show(self) -> None:

@@ -15,7 +15,6 @@ from utility_viz.core.canvas.base import Canvas
 from utility_viz.core.constants.canvas import DEFAULT_DPI
 from utility_viz.core.errors.exceptions import InvalidParameterError
 from utility_viz.core.scenes.styles import to_mosaic_text
-from utility_viz.core.scenes.tikz import canvas_to_tikz
 from utility_viz.core.styles.axis import Axis
 from utility_viz.core.styles.label import Label, split_label
 from utility_viz.core.styles.stroke import Stroke
@@ -178,48 +177,7 @@ class Figure:
     def save(self, target: str | Path, **options: Any) -> list[Path]:
         path = Path(target)
         path.parent.mkdir(parents=True, exist_ok=True)
-        if path.suffix.lower() == ".tex":
-            standalone = bool(options.pop("tikz_standalone", True))
-            if options:
-                names = ", ".join(sorted(options))
-                raise TypeError(f"unsupported TikZ export options: {names}")
-            definitions: set[str] = set()
-            pictures: list[str] = []
-            for canvas in self.canvases:
-                source = canvas_to_tikz(canvas, standalone=False)
-                picture_at = source.index(r"\begin{tikzpicture}")
-                definitions.update(source[:picture_at].splitlines())
-                pictures.append(source[picture_at:])
-            body = "\n".join(sorted(definitions)) + "\n" + self._tikz_grid(pictures)
-            if standalone:
-                body = (
-                    "\\documentclass[tikz,border=12pt]{standalone}\n"
-                    "\\usepackage{xcolor}\n\\usetikzlibrary{arrows.meta}\n"
-                    f"\\begin{{document}}\n{body}\\end{{document}}\n"
-                )
-            path.write_text(body, encoding="utf-8")
-            return [path]
         return self.grid.save(path, **options)
-
-    def _tikz_grid(self, pictures: list[str]) -> str:
-        rows, cols = _LAYOUT_SPECS[self.layout][0]
-        cells: dict[tuple[int, int], tuple[str, _PanelSpec]] = {
-            (spec.row, spec.col): (picture, spec) for spec, picture in zip(self._specs, pictures, strict=True)
-        }
-        lines = [r"\begin{center}"]
-        for row in range(rows):
-            row_cells: list[str] = []
-            col = 0
-            while col < cols:
-                picture, spec = cells[(row, col)]
-                row_cells.append(picture)
-                col += spec.colspan
-            lines.append(f"% row {row + 1} of {rows}")
-            lines.append(r"\hspace{1em}".join(row_cells))
-            if row + 1 < rows:
-                lines.append(r"\par\medskip")
-        lines.append(r"\end{center}")
-        return "\n".join(lines)
 
     def show(self) -> None:
         self.render().show()

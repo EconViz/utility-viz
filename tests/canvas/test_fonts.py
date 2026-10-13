@@ -17,9 +17,9 @@ def test_custom_font_applies_to_existing_and_late_text_layers():
     assert all(layer.style.family == "DejaVu Serif" for layer in _text_layers(canvas))
 
 
-def test_font_fallback_sequence_uses_first_available_family_at_scene_boundary():
+def test_font_fallback_sequence_is_forwarded_without_system_font_discovery():
     canvas = Canvas(font=["No Such Font UtilityViz", "serif"])
-    assert canvas.font == "serif"
+    assert canvas.font == "No Such Font UtilityViz"
     assert canvas.font_families == ("No Such Font UtilityViz", "serif")
 
 
@@ -34,9 +34,8 @@ def test_figure_propagates_font_and_math_font():
         assert next(layer for layer in _text_layers(panel) if layer.id == "axes.origin.label").style.family == "serif"
 
 
-def test_missing_font_and_invalid_math_font_fail_clearly():
-    with pytest.raises(InvalidParameterError, match="No Such Font UtilityViz"):
-        Canvas(font="No Such Font UtilityViz")
+def test_font_availability_is_left_to_the_renderer_but_math_tokens_are_validated():
+    assert Canvas(font="No Such Font UtilityViz").font == "No Such Font UtilityViz"
     with pytest.raises(InvalidParameterError, match="stix"):
         Canvas(math_font="comic")
 

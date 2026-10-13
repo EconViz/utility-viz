@@ -101,12 +101,12 @@ class TestAnimatorSave:
 
 
 # ------------------------------------------------------------------
-# Pillow guard
+# KineticKit guard
 # ------------------------------------------------------------------
 
 
-class TestRequirePillow:
-    """_require_pillow() raises a helpful ImportError."""
+class TestRequireKineticKit:
+    """_require_kinetickit() raises a helpful ImportError."""
 
     def test_import_error_message(self, monkeypatch):
         import builtins
@@ -114,13 +114,13 @@ class TestRequirePillow:
         real_import = builtins.__import__
 
         def _mock_import(name, *args, **kwargs):
-            if name == "PIL":
-                raise ImportError("no PIL")
+            if name.startswith("kinetickit"):
+                raise ImportError("no kinetickit")
             return real_import(name, *args, **kwargs)
 
         monkeypatch.setattr(builtins, "__import__", _mock_import)
 
-        from utility_viz.core.animation.animator import _require_pillow
+        from utility_viz.core.animation.animator import _require_kinetickit
 
-        with pytest.raises(ImportError, match="Pillow is required"):
-            _require_pillow()
+        with pytest.raises(ImportError, match="KineticKit is required"):
+            _require_kinetickit()

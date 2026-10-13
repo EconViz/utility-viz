@@ -66,6 +66,12 @@ def test_tikz_source_uses_native_bezier_and_theme_colors(canvas):
     assert "Marshallian" not in tex
 
 
+def test_utility_viz_reexports_the_mosaickit_scene_exporter():
+    from mosaickit.rendering.tikz import canvas_to_tikz as mosaic_exporter
+
+    assert canvas_to_tikz is mosaic_exporter
+
+
 def test_tikz_exports_legend_text_and_generic_font(tmp_path):
     target = tmp_path / "legend.tex"
     from utility_viz import Canvas as UtilityCanvas
