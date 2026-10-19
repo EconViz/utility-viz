@@ -255,7 +255,7 @@ def test_pyproject_uses_canonical_names():
 
 def test_animation_extra_delegates_gif_export_to_kinetickit():
     extras = _pyproject()["project"]["optional-dependencies"]
-    assert extras["animation"] == ["kinetickit[raster]>=1.0.0b1,<2.0.0"]
+    assert extras["animation"] == ["kinetickit[raster]>=1.0.0b2,<2.0.0"]
     assert not any(item.lower().startswith("pillow") for item in extras["all"])
 
 
