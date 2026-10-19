@@ -13,6 +13,8 @@ MATH_FAMILIES = {
     "stix": "STIXGeneral",
     "stixsans": "STIXGeneral",
 }
+
+
 def resolve_font(font: str | Sequence[str] | None) -> tuple[tuple[str, ...] | None, str | None]:
     """Validate a compatibility hint and leave availability to the renderer."""
     if font is None:
