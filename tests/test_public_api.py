@@ -81,7 +81,7 @@ def test_models_facade_has_no_drawing_dependency():
         "utility_viz.core.errors",
         "utility_viz.core.export",
         "utility_viz.core.constants",
-        "utility_viz.core.rendering.stroke",
+        "utility_viz.core.scenes",
         "utility_viz.core.diagrams.components",
         "utility_viz.core.diagrams.consumer",
         "utility_viz.core.animation",

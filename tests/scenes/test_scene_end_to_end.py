@@ -63,6 +63,40 @@ def test_tikz_source_uses_native_bezier_and_theme_colors(canvas):
     assert "\\draw[" in tex and "\\fill[" in tex and "\\node[" in tex
     assert ".. controls" in tex
     assert "377EB8" in tex and "984EA3" in tex and "E41A1C" in tex
+    assert "Marshallian" not in tex
+
+
+def test_utility_viz_reexports_the_mosaickit_scene_exporter():
+    from mosaickit.rendering.tikz import canvas_to_tikz as mosaic_exporter
+
+    assert canvas_to_tikz is mosaic_exporter
+
+
+def test_tikz_exports_legend_text_and_generic_font(tmp_path):
+    target = tmp_path / "legend.tex"
+    from utility_viz import Canvas as UtilityCanvas
+
+    UtilityCanvas(font="serif").add_budget(2, 3, 30, label="Budget").show_legend().save(target)
+    source = target.read_text(encoding="utf-8")
+    assert source.count("Budget") == 2  # curve label plus legend entry
+    assert r"\rmfamily" in source
+
+
+def test_tikz_exports_canvas_background():
+    from utility_viz import Canvas as UtilityCanvas
+    from utility_viz import themes
+
+    source = canvas_to_tikz(UtilityCanvas(theme=themes.dark))
+    assert r"\path[fill=" in source
+    assert "1E1E1E" in source
+
+
+def test_tikz_preserves_preformatted_math_text():
+    from utility_viz import Canvas as UtilityCanvas
+
+    source = canvas_to_tikz(UtilityCanvas(title=r"$U=\min(2x+y,\ x+3y)$"))
+    assert r"{$U=\min(2x+y,\ x+3y)$};" in source
+    assert r"\textbackslash" not in source
 
 
 @pytest.mark.skipif(shutil.which("pdflatex") is None, reason="pdflatex is not installed")

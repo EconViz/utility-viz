@@ -1,28 +1,228 @@
-"""Layer composition: indifference curves, budgets, equilibria, rays, points and paths."""
+"""Fluent utility-specific MosaicKit layer composition."""
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from dataclasses import replace
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any
 
-from utility_viz.core.canvas._curves import _extend_curve_endpoints, _smooth_xy
-from utility_viz.core.canvas._state import CanvasState
-from utility_viz.core.canvas.renderers import render_budget, render_equilibrium, render_path, render_utility
-from utility_viz.core.rendering.primitives import annotate_math, plot_point
-from utility_viz.core.rendering.stroke import styled
+from mosaickit import LegendLayer, LegendStyle, MarkerLayer, PathLayer, TextLayer, TextStyle
+
+from utility_viz.core.scenes import budget_layers, decomposition_layers, equilibrium_layers, indifference_layers
+from utility_viz.core.scenes.path import smooth_path
+from utility_viz.core.scenes.styles import (
+    to_mosaic_fill,
+    to_mosaic_marker,
+    to_mosaic_stroke,
+    to_mosaic_text,
+)
 from utility_viz.core.styles.fill import Fill
 from utility_viz.core.styles.label import Label, split_label
+from utility_viz.core.styles.legend import Legend
 from utility_viz.core.styles.marker import Marker
+from utility_viz.core.styles.placement import placement
 from utility_viz.core.styles.stroke import Stroke
-from utility_viz.enums import LabelPosition, LineStyle
+from utility_viz.enums import LabelPosition, LineStyle, UtilityType
 
 if TYPE_CHECKING:
     from typing_extensions import Self
 
 
-class LayerMixin(CanvasState):
-    """The ``add_*`` methods of :class:`~utility_viz.core.canvas.base.Canvas` that draw one layer each."""
+_LEGEND_LOCATIONS = {
+    "auto": "best",
+    "top": "upper center",
+    "bottom": "lower center",
+    "left": "center left",
+    "right": "center right",
+}
+
+
+class LayerMixin:
+    legacy_theme: Any
+    font: str | None
+    math_family: str | None
+    x_max: float
+    y_max: float
+    add: Any
+    extend: Any
+    _next_id: Any
+
+    def add_decomposition(
+        self,
+        decomposition,
+        *,
+        show_arrows: bool = True,
+        label_effects: bool = True,
+        show_x_projections: bool = False,
+        point_color: str | None = None,
+        point_markersize: float | None = None,
+        original_budget_color: str | None = None,
+        original_budget_linewidth: float | None = None,
+        original_budget_linestyle: str | None = None,
+        compensated_budget_color: str | None = None,
+        compensated_budget_linewidth: float | None = None,
+        compensated_budget_linestyle: str | None = None,
+        final_budget_color: str | None = None,
+        final_budget_linewidth: float | None = None,
+        final_budget_linestyle: str | None = None,
+        substitution_color: str | None = None,
+        income_color: str | None = None,
+        effect_arrow_linewidth: float | None = None,
+        original_budget_stroke: Stroke | None = None,
+        compensated_budget_stroke: Stroke | None = None,
+        final_budget_stroke: Stroke | None = None,
+        substitution_stroke: Stroke | None = None,
+        income_stroke: Stroke | None = None,
+        projection_stroke: Stroke | None = None,
+        guide_stroke: Stroke | None = None,
+        range_stroke: Stroke | None = None,
+        substitution=None,
+        income=None,
+        point_marker: Marker | None = None,
+        point_label: Label | None = None,
+        show_curves: bool = True,
+        curve_stroke: Stroke | None = None,
+        curve_label: Label | None = None,
+        legend: Legend | None = None,
+    ) -> Self:
+        """Add a Hicks/Slutsky decomposition as backend-neutral layers."""
+        theme = self.legacy_theme
+        budget_specs = (
+            (
+                original_budget_stroke,
+                theme.budget_stroke,
+                original_budget_color,
+                original_budget_linewidth,
+                original_budget_linestyle,
+            ),
+            (
+                compensated_budget_stroke,
+                theme.compensated_budget_stroke,
+                compensated_budget_color,
+                compensated_budget_linewidth,
+                compensated_budget_linestyle,
+            ),
+            (
+                final_budget_stroke,
+                theme.final_budget_stroke,
+                final_budget_color,
+                final_budget_linewidth,
+                final_budget_linestyle,
+            ),
+        )
+        budgets = []
+        for explicit, fallback, color, width, style in budget_specs:
+            selected = (explicit or Stroke()).merged_over(fallback)
+            selected = Stroke(color=color, width=width, style=LineStyle(style) if style else None).merged_over(selected)
+            budgets.append(to_mosaic_stroke(selected))
+
+        marker = (point_marker or Marker()).merged_over(theme.eq_marker)
+        marker = Marker(color=point_color, size=point_markersize).merged_over(marker)
+        _, bundle_label = split_label(point_label, theme.bundle_label)
+        bundle_offset, bundle_anchor = _label_placement(bundle_label)
+        sub = Stroke(
+            color=getattr(substitution, "color", None) or substitution_color,
+            width=effect_arrow_linewidth,
+            opacity=getattr(substitution, "opacity", None),
+            arrow="->",
+        ).merged_over(theme.substitution_stroke)
+        sub = (substitution_stroke or Stroke()).merged_over(sub)
+        inc = Stroke(
+            color=getattr(income, "color", None) or income_color,
+            width=effect_arrow_linewidth,
+            opacity=getattr(income, "opacity", None),
+            arrow="->",
+        ).merged_over(theme.income_stroke)
+        inc = (income_stroke or Stroke()).merged_over(inc)
+        projection_selected = (projection_stroke or Stroke()).merged_over(theme.projection_stroke)
+        guide_selected = (guide_stroke or Stroke()).merged_over(theme.guide_stroke)
+        range_sub = (range_stroke or Stroke()).merged_over(sub)
+        range_inc = (range_stroke or Stroke()).merged_over(inc)
+        substitution_label = (
+            substitution.resolved_label(theme.effect_label) if substitution is not None else (None, None)
+        )
+        income_label = income.resolved_label(theme.effect_label) if income is not None else (None, None)
+
+        def effect_label(value):
+            text, style = value
+            style = style or theme.effect_label
+            offset, anchor = _label_placement(style)
+            return (
+                text,
+                to_mosaic_text(style, family=self.math_family or self.font),
+                offset,
+                anchor,
+                style.visible is not False,
+            )
+
+        self.extend(
+            decomposition_layers(
+                decomposition,
+                y_max=self.y_max,
+                budget_strokes=budgets,
+                bundle_marker=to_mosaic_marker(marker),
+                bundle_text=to_mosaic_text(bundle_label, family=self.math_family or self.font),
+                bundle_text_offset=bundle_offset,
+                bundle_text_anchor=bundle_anchor,
+                bundle_text_visible=bundle_label.visible is not False,
+                substitution_stroke=to_mosaic_stroke(sub),
+                income_stroke=to_mosaic_stroke(inc),
+                projection_stroke=to_mosaic_stroke(projection_selected),
+                guide_stroke=to_mosaic_stroke(guide_selected),
+                range_strokes=(to_mosaic_stroke(range_sub), to_mosaic_stroke(range_inc)),
+                substitution_label=effect_label(substitution_label),
+                income_label=effect_label(income_label),
+                range_y=(getattr(substitution, "y", None), getattr(income, "y", None)),
+                show_arrows=show_arrows,
+                show_x_projections=show_x_projections,
+                label_effects=label_effects,
+            )
+        )
+
+        if show_curves and decomposition.func is not None:
+            selected = (curve_stroke or Stroke()).merged_over(theme.ic_stroke)
+            levels: list[tuple[str, float]] = [
+                ("U0", float(decomposition.A.utility)),
+                ("U1", float(decomposition.C.utility)),
+            ]
+            if not math.isclose(decomposition.B.utility, decomposition.A.utility, rel_tol=1e-9, abs_tol=1e-12):
+                levels.insert(1, ("UB", float(decomposition.B.utility)))
+            names = {"U0": "U_0", "UB": "U_B", "U1": "U_1"}
+            for key, level in levels:
+                layers, _ = indifference_layers(
+                    decomposition.func,
+                    [level],
+                    self.x_max,
+                    self.y_max,
+                    layer_id=f"decomposition.curve.{key}",
+                    show_labels=curve_label is not None,
+                    label_fmt=names[key],
+                    stroke=to_mosaic_stroke(selected),
+                    z_index=1,
+                )
+                if curve_label is not None:
+                    _, label_style = split_label(curve_label, theme.ic_label)
+                    layers = tuple(
+                        TextLayer(
+                            layer.position,
+                            layer.text,
+                            id=layer.id,
+                            role=layer.role,
+                            style=to_mosaic_text(label_style, family=self.math_family or self.font),
+                            offset=layer.offset,
+                            anchor=layer.anchor,
+                            math=True,
+                            z_index=layer.z_index,
+                        )
+                        if isinstance(layer, TextLayer)
+                        else layer
+                        for layer in layers
+                    )
+                self.extend(_with_math_family(layer, self.math_family) for layer in layers)
+        if label_effects:
+            self.show_legend(legend)
+        return self
 
     def add_utility(
         self,
@@ -46,130 +246,43 @@ class LayerMixin(CanvasState):
         highlight_level: float | None = None,
         secondary_stroke: Stroke | None = None,
         label_style: str = "numeric",
+        res: int = 100,
+        resolution: tuple[int, int] = (161, 161),
+        tolerance: float = 0.005,
         **kwargs,
     ) -> Self:
-        """Add indifference curves for a given utility function.
-
-        Prefer *stroke* / *ray_stroke* for line styling; *color* and *linewidth*
-        are shorthand that a :class:`Stroke` supersedes.
-
-        Colour and line-width fall back to the active theme when not
-        specified explicitly.
-
-        Parameters
-        ----------
-        func : UtilityFunction
-            A utility model conforming to the :class:`UtilityFunction` protocol.
-        levels : int or list
-            Number of contour levels (automatically spaced by percentile) or an
-            explicit list of utility values at which to draw contours.
-        color : str or None
-            Curve colour. *None* → ``theme.ic_color``.
-        linewidth : float or None
-            Stroke width. *None* → ``theme.ic_linewidth``.
-        show_rays : bool
-            If ``True``, draw dashed kink-locus rays (KINKED types only).
-        show_kinks : bool
-            If ``True`` and ``func.utility_type is KINKED``, draw circular
-            markers at kink points on each contour level.
-        kink_radius : float
-            Marker size factor for kink dots.
-        show_bliss : bool
-            If ``True`` (default) and *func* has ``bliss_x`` / ``bliss_y``
-            attributes (i.e. a :class:`~utility_viz.models.utility.Satiation` model),
-            draw a star marker at the bliss point.
-        label : str or None
-            Legend label for this indifference curve family.  Appears in the
-            legend when :meth:`show_legend` is called.
-        show_ic_labels : bool
-            If ``True``, place a small text label at the right end of each
-            indifference curve showing its utility level.
-        ic_label_fmt : str
-            Python format string for the level value (default ``"{:.2g}"``).
-        highlight_level : float, optional
-            Utility level to draw at full weight; every other level is drawn
-            subdued using ``secondary_stroke`` (default ``theme.secondary_ic_stroke``).
-            ``None`` (default) draws every level with the same weight.
-        label_style : str
-            ``"numeric"`` (default) labels each curve with its formatted
-            utility value; ``"ordinal"`` labels them ``u_1, u_2, ...`` in
-            ascending order. Only takes effect when curve labels are shown.
-        **kwargs
-            Forwarded to :meth:`matplotlib.axes.Axes.contour`.
-
-        stroke : Stroke, optional
-            Line style for the indifference curves (default ``theme.ic_stroke``);
-            ``arrow`` adds an arrowhead to each curve.
-        ray_stroke : Stroke, optional
-            Line style for kink-locus rays (default ``theme.ray_stroke``).
-        secondary_stroke : Stroke, optional
-            Line style for non-highlighted levels when *highlight_level* is
-            set (default ``theme.secondary_ic_stroke``).
-
-        kink_marker : Marker, optional
-            Colour, size, and shape of kink points (default ``theme.kink_marker``).
-        bliss_marker : Marker, optional
-            Colour, size, and shape of the bliss point (default ``theme.bliss_marker``).
-
-        ic_label : Label, optional
-            Utility-level labels at the right end of each curve (default
-            ``theme.ic_label``); passing one turns them on. Its *text* is the
-            format string, like *ic_label_fmt*.
-        bliss_label : str or Label, optional
-            Text and placement of the bliss-point label (default ``theme.bliss_label``).
-
-        Returns
-        -------
-        Canvas
-            *self*, to allow method chaining.
-        """
-        t = self.theme
-        ic_fmt, ic_style = split_label(ic_label, t.ic_label, ic_label_fmt)
-        bliss_text, bliss_style = split_label(bliss_label, t.bliss_label, t.bliss_label.text)
-        labels = {
-            "ic_label": ic_style,
-            "secondary_ic_label": ic_style,
-            "bliss_label": bliss_style,
-        }
-        markers = {"kink": kink_marker, "bliss": bliss_marker}
-        sec = (secondary_stroke or Stroke()).merged_over(t.secondary_ic_stroke)
-        with styled(
-            self,
-            {"curve": stroke, "ray": ray_stroke, "secondary_curve": secondary_stroke},
-            markers=markers,
-            labels=labels,
-        ):
-            ic = render_utility(
-                self.ax,
-                func=func,
-                levels=levels,
-                color=color or t.ic_color,
-                linewidth=linewidth if linewidth is not None else t.ic_linewidth,
-                show_rays=show_rays,
-                ray_color=t.ray_color,
-                ray_linewidth=t.ray_linewidth,
-                show_kinks=show_kinks,
-                kink_color=t.kink_color,
-                kink_radius=kink_radius,
-                label=label,
-                show_ic_labels=show_ic_labels or ic_label is not None,
-                ic_label_fmt=ic_fmt or ic_label_fmt,
-                show_bliss=show_bliss,
-                bliss_text=bliss_text or t.bliss_label.text or "x^*",
-                bliss_markersize=t.bliss_marker.size if t.bliss_marker.size is not None else 12.0,
-                subsistence_color=t.subsistence_color,
-                subsistence_linewidth=t.subsistence_linewidth,
-                x_max=self.x_max,
-                y_max=self.y_max,
-                highlight_level=highlight_level,
-                secondary_color=sec.color or t.secondary_ic_color or t.ic_color,
-                secondary_linewidth=sec.width if sec.width is not None else t.secondary_ic_linewidth,
-                secondary_opacity=sec.opacity if sec.opacity is not None else t.secondary_ic_opacity,
-                label_style=label_style,
-                **kwargs,
-            )
-            if ic._proxy is not None:
-                self._legend_handles.append(ic._proxy)
+        if kwargs:
+            names = ", ".join(sorted(kwargs))
+            raise TypeError(f"renderer-specific add_utility options are unsupported: {names}")
+        theme = self.legacy_theme
+        selected = Stroke(color=color, width=linewidth).merged_over(theme.ic_stroke)
+        selected = (stroke or Stroke()).merged_over(selected)
+        layer_id = self._next_id("utility")
+        layers, computed = indifference_layers(
+            func,
+            levels,
+            self.x_max,
+            self.y_max,
+            layer_id=layer_id,
+            highlight_level=highlight_level,
+            show_labels=show_ic_labels or ic_label is not None,
+            label_fmt=(ic_label.text if ic_label and ic_label.text else ic_label_fmt),
+            label_style=label_style,
+            res=res,
+            resolution=resolution,
+            tolerance=tolerance,
+            stroke=to_mosaic_stroke(selected),
+            secondary_stroke=to_mosaic_stroke((secondary_stroke or Stroke()).merged_over(theme.secondary_ic_stroke)),
+            legend=label,
+        )
+        if ic_label is not None:
+            _, ic_style = split_label(ic_label, theme.ic_label)
+            layers = tuple(_restyle_text(layer, ic_style, self.math_family or self.font) for layer in layers)
+        layers = tuple(_with_math_family(layer, self.math_family) for layer in layers)
+        self.extend(layers)
+        _add_kink_features(self, func, computed, layer_id, show_rays, show_kinks, kink_radius, ray_stroke, kink_marker)
+        _add_subsistence_lines(self, func, layer_id)
+        _add_bliss_point(self, func, layer_id, show_bliss, selected, bliss_marker, bliss_label)
         return self
 
     def add_budget(
@@ -185,65 +298,27 @@ class LayerMixin(CanvasState):
         fill_alpha: float | None = None,
         stroke: Stroke | None = None,
     ) -> Self:
-        """Add a linear budget constraint px*x + py*y = income.
-
-        Prefer *stroke* for line styling; *color*, *linewidth*, and *linestyle*
-        are shorthand that a :class:`Stroke` supersedes.
-
-        Colour, line-width, and fill opacity fall back to the active
-        theme when not specified explicitly.
-
-        Parameters
-        ----------
-        px, py : float
-            Prices. Must be positive.
-        income : float
-            Total budget. Must be positive.
-        color : str or None
-            Line colour. *None* → ``theme.budget_color``.
-        linewidth : float or None
-            Stroke width. *None* → ``theme.budget_linewidth``.
-        linestyle : str, optional
-            Matplotlib line-style string. *None* -> ``theme.budget_stroke``'s style.
-        label : str or None
-            Optional legend label rendered in LaTeX math mode.
-        fill : bool or Fill
-            ``True`` shades the feasible set below the budget line; a
-            :class:`Fill` also sets its colour and opacity (default
-            ``theme.budget_fill``, coloured like the budget line).
-        fill_alpha : float or None
-            Opacity of the shading. *None* → ``theme.budget_fill_alpha``.
-            A ``Fill`` alpha takes precedence.
-
-        stroke : Stroke, optional
-            Line style for the budget line (default ``theme.budget_stroke``).
-
-        Returns
-        -------
-        Canvas
-            *self*, to allow method chaining.
-        """
-        t = self.theme
-        shade = (fill if isinstance(fill, Fill) else Fill()).merged_over(
-            Fill(alpha=fill_alpha).merged_over(t.budget_fill)
+        theme = self.legacy_theme
+        selected = Stroke(
+            color=color,
+            width=linewidth,
+            style=LineStyle(linestyle) if linestyle is not None else None,
+        ).merged_over(theme.budget_stroke)
+        selected = (stroke or Stroke()).merged_over(selected)
+        shade = fill if isinstance(fill, Fill) else Fill(opacity=fill_alpha)
+        shade = shade.merged_over(theme.budget_fill)
+        layers = budget_layers(
+            px,
+            py,
+            income,
+            layer_id=self._next_id("budget"),
+            fill=fill is not False,
+            label=label,
+            stroke=to_mosaic_stroke(selected),
+            fill_style=to_mosaic_fill(shade),
+            legend=label,
         )
-        line_color = color or t.budget_color
-        with styled(self, {"budget": stroke}):
-            render_budget(
-                self.ax,
-                px=px,
-                py=py,
-                income=income,
-                color=line_color,
-                linewidth=linewidth if linewidth is not None else t.budget_linewidth,
-                # Theme.budget_stroke always normalises style to a LineStyle.
-                linestyle=linestyle or cast(LineStyle, t.budget_stroke.style).value,
-                label=label,
-                fill=fill is not False,
-                fill_alpha=shade.opacity if shade.opacity is not None else t.budget_fill_alpha,
-                # Unset, the fill follows the line, including a Stroke colour.
-                fill_color=shade.color or (stroke.color if stroke is not None and stroke.color else None),
-            )
+        self.extend(_with_math_family(layer, self.math_family) for layer in layers)
         return self
 
     def add_equilibrium(
@@ -258,66 +333,29 @@ class LayerMixin(CanvasState):
         ray_stroke: Stroke | None = None,
         marker: Marker | None = None,
     ) -> Self:
-        """Annotate a pre-solved equilibrium on the canvas.
-
-        Call :func:`~utility_viz.models.optimization.solve` first, then pass the
-        resulting :class:`~utility_viz.models.optimization.Equilibrium` here.
-
-        Parameters
-        ----------
-        eq : Equilibrium
-            A solved equilibrium bundle.
-        color : str or None
-            Marker / drop-line colour. *None* → ``theme.eq_color``.
-        markersize : float or None
-            Dot size. *None* → ``theme.eq_markersize``.
-        label : str, Label, or None
-            LaTeX label placed next to the dot, or a :class:`Label` for its
-            text, position, colour, and size (default ``theme.point_label``;
-            a Label without text keeps ``x^*``). *None* draws no label.
-        drop_dashes : bool
-            Draw dashed perpendicular lines from the optimum to both axes.
-        show_ray : bool
-            Draw the expansion-path ray from the origin through the optimum.
-
-        drop_stroke : Stroke, optional
-            Line style for the guides to both axes (default ``theme.drop_stroke``).
-        ray_stroke : Stroke, optional
-            Line style for the expansion-path ray (default ``theme.ray_stroke``).
-
-        marker : Marker, optional
-            Colour, size, and shape of the equilibrium point (default ``theme.eq_marker``).
-
-        Returns
-        -------
-        Canvas
-            *self*, to allow method chaining.
-        """
-        t = self.theme
-        text, style = split_label(label, t.point_label, "x^*")
-        with styled(
-            self,
-            {"drop": drop_stroke, "ray": ray_stroke},
-            markers={"equilibrium": marker},
-            labels={"equilibrium_label": style},
-        ):
-            # Theme.eq_marker/drop_stroke/ray_stroke always normalise shape/style.
-            render_equilibrium(
-                self.ax,
-                eq=eq,
-                color=color or t.eq_color,
-                markersize=markersize if markersize is not None else t.eq_markersize,
+        theme = self.legacy_theme
+        text, label_style = split_label(label, theme.point_label, "x^*")
+        selected_marker = Marker(color=color, size=markersize).merged_over(theme.eq_marker)
+        selected_marker = (marker or Marker()).merged_over(selected_marker)
+        layers = list(
+            equilibrium_layers(
+                eq,
+                layer_id=self._next_id("equilibrium"),
                 label=text,
-                drop_dashes=drop_dashes,
-                show_ray=show_ray,
-                ray_color=t.ray_color,
-                ray_linewidth=t.ray_linewidth,
-                x_max=self.x_max,
-                y_max=self.y_max,
-                marker_shape=t.eq_marker.shape or "o",
-                drop_linestyle=cast(LineStyle, t.drop_stroke.style).value,
-                ray_linestyle=cast(LineStyle, t.ray_stroke.style).value,
+                drop_lines=drop_dashes,
+                ray_to=(self.x_max, self.y_max) if show_ray else None,
+                marker=to_mosaic_marker(selected_marker),
+                drop_stroke=to_mosaic_stroke((drop_stroke or Stroke()).merged_over(theme.drop_stroke)),
+                ray_stroke=to_mosaic_stroke((ray_stroke or Stroke()).merged_over(theme.ray_stroke)),
             )
+        )
+        if text:
+            for index, layer in enumerate(layers):
+                if isinstance(layer, TextLayer):
+                    if label_style.color is None and selected_marker.color is not None:
+                        label_style = Label(color=selected_marker.color).merged_over(label_style)
+                    layers[index] = _restyle_text(layer, label_style, self.math_family or self.font)
+        self.extend(_with_math_family(layer, self.math_family) for layer in layers)
         return self
 
     def add_ray(
@@ -327,42 +365,23 @@ class LayerMixin(CanvasState):
         linewidth: float | None = None,
         stroke: Stroke | None = None,
     ) -> Self:
-        """Add a dashed ray emanating from the origin.
-
-        Prefer *stroke* for line styling; *color* and *linewidth* are
-        shorthand that a :class:`Stroke` supersedes.
-
-        Parameters
-        ----------
-        slope : float
-            Rise-over-run slope of the ray (dy / dx).
-        color : str or None
-            *None* → ``theme.ray_color``.
-        linewidth : float or None
-            *None* → ``theme.ray_linewidth``.
-
-        stroke : Stroke, optional
-            Line style for the ray (default ``theme.ray_stroke``).
-
-        Returns
-        -------
-        Canvas
-            *self*, to allow method chaining.
-        """
-        with styled(self, {"ray": stroke}):
-            from utility_viz.core.diagrams.components import draw_ray
-
-            t = self.theme
-            draw_ray(
-                self.ax,
-                slope,
-                self.x_max,
-                self.y_max,
-                color=color or t.ray_color,
-                linewidth=linewidth if linewidth is not None else t.ray_linewidth,
-                # Theme.ray_stroke always normalises style to a LineStyle.
-                linestyle=cast(LineStyle, t.ray_stroke.style).value,
+        if not math.isfinite(slope) or slope < 0:
+            raise ValueError("slope must be finite and non-negative")
+        end = (
+            (self.x_max, min(self.y_max, slope * self.x_max))
+            if slope <= self.y_max / self.x_max
+            else (self.y_max / slope, self.y_max)
+        )
+        selected = Stroke(color=color, width=linewidth).merged_over(self.legacy_theme.ray_stroke)
+        selected = (stroke or Stroke()).merged_over(selected)
+        self.add(
+            PathLayer(
+                ((0, 0), end),
+                id=self._next_id("ray"),
+                role="utility.equilibrium.ray",
+                stroke=to_mosaic_stroke(selected),
             )
+        )
         return self
 
     def add_point(
@@ -375,66 +394,37 @@ class LayerMixin(CanvasState):
         offset: tuple[float, float] | None = None,
         marker: Marker | None = None,
     ) -> Self:
-        """Plot a labelled point on the canvas.
-
-        Parameters
-        ----------
-        x, y : float
-            Coordinates of the point.
-        label : str, Label, or None
-            Text label (rendered in LaTeX math mode if provided), or a
-            :class:`Label` for its text, position, colour, and size (default
-            ``theme.point_label``).
-        color : str or None
-            Marker and label colour. *None* → ``theme.eq_color``.
-        markersize : float or None
-            Size of the dot. *None* → ``theme.point_marker.size``.
-        offset : tuple[float, float], optional
-            ``(dx, dy)`` text offset in points from the marker centre
-            (default ``(5, 5)``). A Label position or offset takes precedence.
-
-        marker : Marker, optional
-            Colour, size, and shape of the point (default ``theme.point_marker``).
-
-        Returns
-        -------
-        Canvas
-            *self*, to allow method chaining.
-        """
-        text, style = split_label(label, self.theme.point_label)
-        moves = isinstance(label, Label) and (label.position is not None or label.offset is not None)
-        if offset is not None and not moves:
-            # An explicit (dx, dy) keeps its place unless the Label itself moves the text.
-            style = replace(style, position=None, offset=None)
-        with styled(self, {}, markers={"point": marker}, labels={"point_label": style}):
-            c = color or self.theme.eq_color
-            plot_point(
-                self.ax,
-                x=x,
-                y=y,
-                color=c,
-                markersize=(
-                    markersize if markersize is not None else (self.theme.point_marker.size or self.theme.eq_markersize)
-                ),
-                marker=self.theme.point_marker.shape or "o",
-                linestyle="None",
-                zorder=6,
-                clip_on=False,
-                role="point",
+        prefix = self._next_id("point")
+        selected = Marker(color=color, size=markersize).merged_over(self.legacy_theme.point_marker)
+        selected = (marker or Marker()).merged_over(selected)
+        self.add(
+            MarkerLayer(
+                ((x, y),),
+                id=prefix,
+                role="utility.equilibrium",
+                marker=to_mosaic_marker(selected),
+                z_index=6,
             )
-            if text:
-                annotate_math(
-                    self.ax,
-                    x=x,
-                    y=y,
-                    text=text,
-                    color=c,
-                    offset=offset or (5, 5),
-                    fontsize=12,
-                    zorder=7,
-                    role="point_label",
-                    default=None if offset else Label(position=LabelPosition.TOP_RIGHT, offset=5),
+        )
+        text, style = split_label(label, self.legacy_theme.point_label)
+        if text:
+            if style.color is None and selected.color is not None:
+                style = Label(color=selected.color).merged_over(style)
+            label_offset, anchor = _label_placement(style, legacy_offset=offset)
+            self.add(
+                TextLayer(
+                    (x, y),
+                    text,
+                    id=f"{prefix}.label",
+                    role="utility.equilibrium",
+                    style=to_mosaic_text(style, family=self.math_family or self.font),
+                    offset=label_offset,
+                    anchor=anchor,
+                    math=True,
+                    visible=style.visible is not False,
+                    z_index=7,
                 )
+            )
         return self
 
     def add_path(
@@ -455,47 +445,235 @@ class LayerMixin(CanvasState):
         point_marker: Marker | None = None,
         equilibrium_marker: Marker | None = None,
     ) -> Self:
-        """Draw a PCC/ICC-style path through a sequence of equilibria.
-
-        Prefer *stroke* for line styling; *color* and *linewidth* are
-        shorthand that a :class:`Stroke` supersedes.
-
-        Parameters
-        ----------
-        stroke : Stroke, optional
-            Line style for the path line (default ``theme.path_stroke``).
-        budget_stroke : Stroke, optional
-            Line style for budget lines drawn with ``show_budgets``.
-        curve_stroke : Stroke, optional
-            Line style for indifference curves drawn with ``show_curves``.
-        point_marker : Marker, optional
-            Colour, size, and shape of points drawn with ``show_points`` (default ``theme.path_marker``).
-        equilibrium_marker : Marker, optional
-            Colour, size, and shape of points drawn with ``show_equilibria``.
-        """
-        with styled(
-            self,
-            {"path": stroke, "budget": budget_stroke, "curve": curve_stroke},
-            markers={"path_point": point_marker, "equilibrium": equilibrium_marker},
-        ):
-            c = color or self.theme.path_color
-            lw = linewidth if linewidth is not None else self.theme.path_linewidth
-            show_points = path.default_show_points if show_points is None else show_points
-            show_budgets = path.default_show_budgets if show_budgets is None else show_budgets
-            smooth_curve = path.default_smooth_curve if smooth_curve is None else smooth_curve
-            render_path(
-                canvas=self,
-                path=path,
-                color=c,
-                linewidth=lw,
-                label=label,
-                show_points=show_points,
-                show_budgets=show_budgets,
-                show_curves=show_curves,
-                show_equilibria=show_equilibria,
-                invert_axes=invert_axes,
-                smooth_curve=smooth_curve,
-                smooth_fn=_smooth_xy,
-                extend_fn=_extend_curve_endpoints,
+        prefix = self._next_id("path")
+        points = (
+            tuple(zip(path.parameter_values, path.quantity_values("x"), strict=True))
+            if invert_axes
+            else tuple(zip(path.x_values, path.y_values, strict=True))
+        )
+        use_smoothing = path.default_smooth_curve if smooth_curve is None else smooth_curve
+        rendered_points, bezier = smooth_path(points) if use_smoothing else (list(points), None)
+        selected = Stroke(color=color, width=linewidth).merged_over(self.legacy_theme.path_stroke)
+        selected = (stroke or Stroke()).merged_over(selected)
+        self.add(
+            PathLayer(
+                rendered_points,
+                id=prefix,
+                role="utility.path",
+                stroke=to_mosaic_stroke(selected),
+                legend=label,
+                model=bezier or path,
+                z_index=4,
             )
+        )
+        show_points = path.default_show_points if show_points is None else show_points
+        show_budgets = path.default_show_budgets if show_budgets is None else show_budgets
+        if show_points or show_equilibria:
+            chosen = equilibrium_marker if show_equilibria else point_marker
+            fallback = self.legacy_theme.eq_marker if show_equilibria else self.legacy_theme.path_marker
+            self.add(
+                MarkerLayer(
+                    points,
+                    id=f"{prefix}.points",
+                    role="utility.equilibrium" if show_equilibria else "utility.path",
+                    marker=to_mosaic_marker((chosen or Marker()).merged_over(fallback)),
+                    z_index=5,
+                )
+            )
+        if show_budgets:
+            for index, budget in enumerate(path.budgets, 1):
+                self.extend(
+                    budget_layers(
+                        budget.px,
+                        budget.py,
+                        budget.income,
+                        layer_id=f"{prefix}.budget.{index}",
+                        stroke=to_mosaic_stroke(
+                            (budget_stroke or Stroke()).merged_over(self.legacy_theme.budget_stroke)
+                        ),
+                    )
+                )
+        if show_curves:
+            for index, eq in enumerate(path.equilibria, 1):
+                layers, _ = indifference_layers(
+                    path.func,
+                    [eq.utility],
+                    self.x_max,
+                    self.y_max,
+                    layer_id=f"{prefix}.curve.{index}",
+                    stroke=to_mosaic_stroke((curve_stroke or Stroke()).merged_over(self.legacy_theme.ic_stroke)),
+                )
+                self.extend(layers)
         return self
+
+    def show_legend(self, legend: Legend | None = None, **kwargs) -> Self:
+        if kwargs:
+            names = ", ".join(sorted(kwargs))
+            raise TypeError(f"renderer-specific legend options are unsupported: {names}")
+        selected = (legend or Legend()).merged_over(self.legacy_theme.legend)
+        if selected.visible is False:
+            return self
+        self.add(
+            LegendLayer(
+                id=self._next_id("legend"),
+                style=LegendStyle(
+                    visible=selected.visible,
+                    location=_mosaic_legend_location(selected.position),
+                    frame=selected.frame,
+                    size=selected.fontsize,
+                ),
+            )
+        )
+        return self
+
+
+def _add_kink_features(
+    canvas: Any,
+    func: Any,
+    levels: list[float],
+    layer_id: str,
+    show_rays: bool,
+    show_kinks: bool,
+    kink_radius: float,
+    ray_stroke: Stroke | None,
+    kink_marker: Marker | None,
+) -> None:
+    if getattr(func, "utility_type", None) is not UtilityType.KINKED:
+        return
+    if show_rays:
+        for slope in func.ray_slopes():
+            canvas.add_ray(slope, stroke=ray_stroke)
+    if not show_kinks:
+        return
+    chosen = (kink_marker or Marker()).merged_over(canvas.legacy_theme.kink_marker)
+    if kink_marker is None:
+        chosen = Marker(size=4 * kink_radius).merged_over(chosen)
+    points = tuple((float(x), float(y)) for x, y in func.kink_points(levels))
+    if points:
+        canvas.add(
+            MarkerLayer(
+                points,
+                marker=to_mosaic_marker(chosen),
+                id=f"{layer_id}.kinks",
+                role="utility.indifference.kink",
+                z_index=5,
+            )
+        )
+
+
+def _add_subsistence_lines(canvas: Any, func: Any, layer_id: str) -> None:
+    if not hasattr(func, "subsistence_lines"):
+        return
+    sub_x, sub_y = func.subsistence_lines()
+    stroke = to_mosaic_stroke(canvas.legacy_theme.subsistence_stroke)
+    canvas.add(
+        PathLayer(
+            ((sub_x, 0), (sub_x, canvas.y_max)),
+            stroke=stroke,
+            id=f"{layer_id}.subsistence.x",
+            role="utility.indifference.subsistence",
+            z_index=0,
+        )
+    )
+    canvas.add(
+        PathLayer(
+            ((0, sub_y), (canvas.x_max, sub_y)),
+            stroke=stroke,
+            id=f"{layer_id}.subsistence.y",
+            role="utility.indifference.subsistence",
+            z_index=0,
+        )
+    )
+
+
+def _add_bliss_point(
+    canvas: Any,
+    func: Any,
+    layer_id: str,
+    show_bliss: bool,
+    curve_stroke: Stroke,
+    bliss_marker: Marker | None,
+    bliss_label: str | Label | None,
+) -> None:
+    if not show_bliss or not hasattr(func, "bliss_x") or not hasattr(func, "bliss_y"):
+        return
+    chosen = (bliss_marker or Marker()).merged_over(canvas.legacy_theme.bliss_marker)
+    if chosen.color is None:
+        chosen = Marker(color=curve_stroke.color).merged_over(chosen)
+    canvas.add(
+        MarkerLayer(
+            ((func.bliss_x, func.bliss_y),),
+            marker=to_mosaic_marker(chosen),
+            id=f"{layer_id}.bliss",
+            role="utility.indifference.bliss",
+            z_index=5,
+        )
+    )
+    text, style = split_label(bliss_label, canvas.legacy_theme.bliss_label, canvas.legacy_theme.bliss_label.text)
+    if not text:
+        return
+    offset, anchor = _label_placement(style)
+    if style.color is None and chosen.color is not None:
+        style = Label(color=chosen.color).merged_over(style)
+    canvas.add(
+        TextLayer(
+            (func.bliss_x, func.bliss_y),
+            text,
+            style=to_mosaic_text(style, family=canvas.math_family or canvas.font),
+            offset=offset,
+            anchor=anchor,
+            math=True,
+            visible=style.visible is not False,
+            id=f"{layer_id}.bliss.label",
+            role="utility.indifference.bliss.label",
+            z_index=6,
+        )
+    )
+
+
+def _mosaic_legend_location(position: Any) -> str | None:
+    """Translate utility-viz placement names to MosaicKit renderer locations."""
+    if position is None:
+        return None
+    value = str(getattr(position, "value", position))
+    return _LEGEND_LOCATIONS.get(value, value)
+
+
+def _label_placement(
+    style: Label, *, legacy_offset: tuple[float, float] | None = None
+) -> tuple[tuple[float, float], str]:
+    """Translate the public point-label placement to MosaicKit's offset/anchor pair."""
+    if style.position is None and legacy_offset is not None:
+        dx, dy = legacy_offset
+        horizontal = "left" if dx >= 0 else "right"
+        vertical = "bottom" if dy >= 0 else "top"
+        return legacy_offset, f"{vertical}-{horizontal}"
+    position = LabelPosition(style.position or LabelPosition.TOP_RIGHT)
+    offset, horizontal, vertical = placement(position, style.offset or 5)
+    anchor = "-".join(part for part in (vertical, horizontal) if part != "center") or "center"
+    return offset, anchor
+
+
+def _restyle_text(layer, style: Label, font: str | None):
+    if not isinstance(layer, TextLayer):
+        return layer
+    offset, anchor = _label_placement(style)
+    return TextLayer(
+        layer.position,
+        layer.text,
+        id=layer.id,
+        role=layer.role,
+        style=to_mosaic_text(style, family=font),
+        offset=offset,
+        anchor=anchor,
+        math=layer.math,
+        visible=style.visible is not False,
+        z_index=layer.z_index,
+    )
+
+
+def _with_math_family(layer, family: str | None):
+    if not isinstance(layer, TextLayer) or not layer.math or family is None:
+        return layer
+    style = TextStyle(family=family)
+    return replace(layer, style=style.merged_over(layer.style) if layer.style is not None else style)

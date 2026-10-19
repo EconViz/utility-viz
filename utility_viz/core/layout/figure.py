@@ -1,21 +1,20 @@
-"""Multi-panel figure assembly for economic diagrams."""
+"""Multi-panel utility diagrams composed with MosaicKit CanvasGrid."""
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Final
+from pathlib import Path
+from typing import Any, Final, cast
 
-import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure as MplFigure
-from matplotlib.gridspec import GridSpec
+from mosaickit import Canvas as MosaicCanvas
+from mosaickit import CanvasGrid, TextLayer
+from mosaickit import Layout as MosaicLayout
 
 from utility_viz.core.canvas.base import Canvas
-from utility_viz.core.config.settings import Config
 from utility_viz.core.constants.canvas import DEFAULT_DPI
-from utility_viz.core.export import save_figure
-from utility_viz.core.rendering.fonts import FontApplier, resolve_font, resolve_math_font
+from utility_viz.core.errors.exceptions import InvalidParameterError
+from utility_viz.core.scenes.styles import to_mosaic_text
 from utility_viz.core.styles.axis import Axis
 from utility_viz.core.styles.label import Label, split_label
 from utility_viz.core.styles.stroke import Stroke
@@ -25,69 +24,37 @@ from utility_viz.enums import ArrowStyle, LabelPosition, Layout, LineStyle
 
 @dataclass(frozen=True)
 class _PanelSpec:
-    """GridSpec placement for one panel."""
-
     row: int
     col: int
     rowspan: int = 1
     colspan: int = 1
 
 
-_LAYOUT_SPECS: Final[dict[Layout, tuple[tuple[int, int], list[_PanelSpec]]]] = {
-    Layout.SINGLE: ((1, 1), [_PanelSpec(0, 0)]),
-    Layout.STACKED: ((2, 1), [_PanelSpec(0, 0), _PanelSpec(1, 0)]),
-    Layout.SIDE_BY_SIDE: ((1, 2), [_PanelSpec(0, 0), _PanelSpec(0, 1)]),
-    Layout.TOP_TWO_BOTTOM_ONE: ((2, 2), [_PanelSpec(0, 0), _PanelSpec(0, 1), _PanelSpec(1, 0, colspan=2)]),
-    Layout.TOP_ONE_BOTTOM_TWO: ((2, 2), [_PanelSpec(0, 0, colspan=2), _PanelSpec(1, 0), _PanelSpec(1, 1)]),
-    Layout.GRID_2X2: ((2, 2), [_PanelSpec(0, 0), _PanelSpec(0, 1), _PanelSpec(1, 0), _PanelSpec(1, 1)]),
+_LAYOUT_SPECS: Final[dict[Layout, tuple[tuple[int, int], tuple[_PanelSpec, ...]]]] = {
+    Layout.SINGLE: ((1, 1), (_PanelSpec(0, 0),)),
+    Layout.STACKED: ((2, 1), (_PanelSpec(0, 0), _PanelSpec(1, 0))),
+    Layout.SIDE_BY_SIDE: ((1, 2), (_PanelSpec(0, 0), _PanelSpec(0, 1))),
+    Layout.TOP_TWO_BOTTOM_ONE: (
+        (2, 2),
+        (_PanelSpec(0, 0), _PanelSpec(0, 1), _PanelSpec(1, 0, colspan=2)),
+    ),
+    Layout.TOP_ONE_BOTTOM_TWO: (
+        (2, 2),
+        (_PanelSpec(0, 0, colspan=2), _PanelSpec(1, 0), _PanelSpec(1, 1)),
+    ),
+    Layout.GRID_2X2: (
+        (2, 2),
+        tuple(_PanelSpec(row, col) for row in range(2) for col in range(2)),
+    ),
     Layout.GRID_3X3: (
         (3, 3),
-        [_PanelSpec(r, c) for r in range(3) for c in range(3)],
+        tuple(_PanelSpec(row, col) for row in range(3) for col in range(3)),
     ),
 }
 
 
 class Figure:
-    """A fixed-layout collection of canvases sharing one matplotlib figure.
-
-    Parameters
-    ----------
-    layout : Layout
-        Named panel arrangement.
-    x_max, y_max : float
-        Axis limits applied to every panel.
-    x_label, y_label : str
-        Axis labels applied to every panel.
-    title : str, Label, or None
-        Optional super-title for the whole figure, or a :class:`Label` that
-        also sets its font size and colour (default ``theme.title_label``).
-    dpi : int
-        Export resolution passed through to panel canvases.
-    x_label_pos, y_label_pos : LabelPosition or str
-        Per-panel label placement options forwarded to :class:`Canvas`.
-    theme : Theme
-        Theme shared across all panels.
-    shared_x, shared_y : bool
-        When enabled, matplotlib links axes and inner-edge axis-tip labels are
-        suppressed.
-    figsize : tuple[float, float] | None
-        Optional explicit figure size. Defaults to ``(6 * cols, 6 * rows)``.
-    hspace, wspace : float
-        GridSpec spacing parameters.
-    x_arrow_style, y_arrow_style : ArrowStyle or str
-        Per-panel axis arrowhead styles forwarded to :class:`Canvas`.
-    font : str or sequence of str, optional
-        Font family applied to every panel and the super-title.
-    math_font : str, optional
-        Math font set applied to every panel. See :class:`Canvas`.
-    x_line_style, y_line_style : LineStyle or str
-        Per-panel axis line styles forwarded to :class:`Canvas`.
-    axis_stroke, x_axis_stroke, y_axis_stroke : Stroke, optional
-        Per-panel axis strokes forwarded to :class:`Canvas`.
-    x_axis, y_axis : Axis, optional
-        Per-panel axis label, label position, and stroke forwarded to
-        :class:`Canvas`, with the same precedence.
-    """
+    """A fixed-layout collection of utility canvases rendered as one grid."""
 
     def __init__(
         self,
@@ -117,30 +84,35 @@ class Figure:
         y_axis_stroke: Stroke | None = None,
         x_axis: Axis | None = None,
         y_axis: Axis | None = None,
-    ):
-        """Create a multi-panel figure composed of injected :class:`Canvas` instances."""
-        shape, specs, theme = self._init_figure(layout, theme, font, math_font, figsize, shared_x, shared_y)
+    ) -> None:
+        if hspace != 0.3 or wspace != 0.25:
+            raise InvalidParameterError(
+                "custom hspace/wspace are unavailable in MosaicKit CanvasGrid; "
+                "use the default spacing or size panels with figsize"
+            )
+        self.layout = Layout(layout)
+        self.shared_x = shared_x
+        self.shared_y = shared_y
+        self.title, self.title_style = split_label(title, (theme or Theme("default")).title_label)
+        self.hspace = hspace
+        self.wspace = wspace
+        shape, specs = _LAYOUT_SPECS[self.layout]
         rows, cols = shape
-        self._add_suptitle(title, theme)
-
-        gs = GridSpec(rows, cols, figure=self.fig, hspace=hspace, wspace=wspace)
-        self.canvases: list[Canvas] = []
-        self._grid_lookup: dict[tuple[int, int], Canvas] = {}
-        canvas_kwargs: dict[str, Any] = dict(
+        width = (figsize[0] / cols) if figsize else 6.0
+        height = (figsize[1] / rows) if figsize else 6.0
+        kwargs: Any = dict(
             x_max=x_max,
             y_max=y_max,
             x_label=x_label,
             y_label=y_label,
-            title=None,
             dpi=dpi,
             x_label_pos=x_label_pos,
             y_label_pos=y_label_pos,
+            theme=theme,
             x_arrow_style=x_arrow_style,
             y_arrow_style=y_arrow_style,
-            theme=theme,
-            fig=self.fig,
-            font=self.font,
-            math_font=self.math_font,
+            font=font,
+            math_font=math_font,
             x_line_style=x_line_style,
             y_line_style=y_line_style,
             axis_stroke=axis_stroke,
@@ -149,99 +121,63 @@ class Figure:
             x_axis=x_axis,
             y_axis=y_axis,
         )
-        self._build_panels(gs, specs, canvas_kwargs)
+        self.canvases = [Canvas(**kwargs) for _ in specs]
+        for canvas in self.canvases:
+            canvas.spec = canvas.spec.replace(width=width, height=height)
+        self._specs = specs
+        self._grid_lookup = {(spec.row, spec.col): canvas for spec, canvas in zip(specs, self.canvases, strict=True)}
+        self._apply_shared_axis_labels(shape)
+        self._add_figure_title(shape)
 
-        self._apply_shared_axes(shape, specs)
-
-    def _init_figure(self, layout, theme, font, math_font, figsize, shared_x, shared_y):
-        """Resolve config defaults and create the matplotlib figure."""
-        active = Config.active()
-        theme = theme if theme is not None else active.theme
-        font = font if font is not None else active.font
-        math_font = math_font if math_font is not None else active.math_font
-        self.layout = layout
-        self.shared_x = shared_x
-        self.shared_y = shared_y
-        self.font = resolve_font(font)
-        self.math_font = resolve_math_font(math_font)
-        shape, specs = _LAYOUT_SPECS[layout]
-        rows, cols = shape
-        width = 6.0 * cols
-        height = 6.0 * rows
-        self.fig: MplFigure = plt.figure(figsize=figsize or (width, height))
-        self.fig.patch.set_alpha(0.0)
-        if self.font or self.math_font:
-            self.fig.add_artist(FontApplier(self.font, self.math_font))
-        return shape, specs, theme
-
-    def _add_suptitle(self, title: str | Label | None, theme: Theme) -> None:
-        """Add the figure super-title, honouring a :class:`Label` style."""
-        title_text, title_style = split_label(title, theme.title_label)
-        if title_text:
-            suptitle = self.fig.suptitle(
-                title_text,
-                color=title_style.color or theme.label_color,
-                **({"fontsize": title_style.fontsize} if title_style.fontsize else {}),
+    def _add_figure_title(self, shape: tuple[int, int]) -> None:
+        """Represent the figure title in the scene rather than renderer state."""
+        if not self.title or self.title_style.visible is False:
+            return
+        _, cols = shape
+        center_column = cols / 2
+        spec = next(
+            spec for spec in self._specs if spec.row == 0 and spec.col <= center_column <= spec.col + spec.colspan
+        )
+        canvas = self._grid_lookup[spec.row, spec.col]
+        local_midpoint = (center_column - spec.col) / spec.colspan * canvas.x_max
+        canvas.add(
+            TextLayer(
+                (local_midpoint, canvas.y_max),
+                self.title,
+                id="figure.title",
+                role="title",
+                style=to_mosaic_text(self.title_style, family=canvas.font),
+                offset=(0, 24),
+                anchor="bottom",
+                z_index=20,
             )
-            suptitle.set_visible(title_style.visible is not False)
-            suptitle.set_alpha(title_style.opacity)
-
-    def _build_panels(self, gs: GridSpec, specs: list[_PanelSpec], canvas_kwargs: dict[str, Any]) -> None:
-        """Create one axes and :class:`Canvas` per panel spec."""
-        anchor_ax: Axes | None = None
-        for spec in specs:
-            sharex_ax = anchor_ax if self.shared_x else None
-            sharey_ax = anchor_ax if self.shared_y else None
-            ax = self.fig.add_subplot(
-                gs[spec.row : spec.row + spec.rowspan, spec.col : spec.col + spec.colspan],
-                sharex=sharex_ax,
-                sharey=sharey_ax,
-            )
-            if anchor_ax is None:
-                anchor_ax = ax
-            canvas = Canvas(ax=ax, **canvas_kwargs)
-            self.canvases.append(canvas)
-            self._grid_lookup[(spec.row, spec.col)] = canvas
-
-    def _apply_shared_axes(self, shape: tuple[int, int], specs: list[_PanelSpec]) -> None:
-        """Hide duplicated axis-tip labels on inner edges for shared-axis layouts."""
-        rows, cols = shape
-        for spec, canvas in zip(specs, self.canvases, strict=True):
-            show_x = not self.shared_x or (spec.row + spec.rowspan == rows)
-            show_y = not self.shared_y or spec.col == 0
-            canvas.set_axis_visibility(show_x_label=show_x, show_y_label=show_y)
-
-    def __getitem__(self, idx: int | tuple[int, int]) -> Canvas:
-        """Return a panel canvas by flat index or ``(row, col)`` location."""
-        if isinstance(idx, tuple):
-            return self._grid_lookup[idx]
-        return self.canvases[idx]
-
-    def __len__(self) -> int:
-        """Return the number of panels in the layout."""
-        return len(self.canvases)
-
-    def save(self, path: str, **kwargs) -> None:
-        """Save the full multi-panel figure to ``.png``, ``.svg``, ``.pdf``, or ``.tex``.
-
-        Raises
-        ------
-        ValueError
-            If the file extension is unsupported.
-        ExportError
-            If writing to disk fails.
-        """
-        opaque_background = self.canvases[0].theme.background_color if self.canvases else None
-        kwargs.setdefault("transparent", opaque_background is None)
-        save_figure(
-            self.fig,
-            path=path,
-            dpi=self.canvases[0].dpi if self.canvases else 300,
-            close=True,
-            unsupported_as_value_error=True,
-            **kwargs,
         )
 
+    def _apply_shared_axis_labels(self, shape: tuple[int, int]) -> None:
+        rows, _ = shape
+        for spec, canvas in zip(self._specs, self.canvases, strict=True):
+            canvas.set_axis_visibility(
+                show_x_label=not self.shared_x or spec.row + spec.rowspan == rows,
+                show_y_label=not self.shared_y or spec.col == 0,
+            )
+
+    @property
+    def grid(self) -> CanvasGrid:
+        return CanvasGrid.from_layout(cast(list[MosaicCanvas], self.canvases), MosaicLayout(self.layout.value))
+
+    def __getitem__(self, idx: int | tuple[int, int]) -> Canvas:
+        return self._grid_lookup[idx] if isinstance(idx, tuple) else self.canvases[idx]
+
+    def __len__(self) -> int:
+        return len(self.canvases)
+
+    def render(self, **options: Any) -> Any:
+        return self.grid.render(**options)
+
+    def save(self, target: str | Path, **options: Any) -> list[Path]:
+        path = Path(target)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return self.grid.save(path, **options)
+
     def show(self) -> None:
-        """Display the multi-panel figure interactively."""
-        self.fig.show()
+        self.render().show()

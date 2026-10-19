@@ -71,7 +71,7 @@ def test_unknown_attribute_raises():
         ("econ_viz.consumer", "EdgeworthBox"),
         ("econ_viz.consumer", "PricePath"),
         ("econ_viz.consumer.paths", "LinearBudget"),
-        ("econ_viz.io.backend_tikz", "figure_to_tikz"),
+        ("econ_viz.io", "save_figure"),
         ("econ_viz.canvas.layers", "Layer"),
         ("econ_viz.canvas.base", "Canvas"),
         ("econ_viz.canvas", "Layer"),

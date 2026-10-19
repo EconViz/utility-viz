@@ -1,58 +1,52 @@
-"""Shared figure-export helpers."""
+"""Scene-owned export dispatch without renderer-specific figure objects."""
 
 from __future__ import annotations
 
-from matplotlib.figure import Figure as MplFigure
+from pathlib import Path
+from typing import Any
 
-from utility_viz.core.constants.io import SAVEFIG_BBOX_INCHES
 from utility_viz.core.errors.exceptions import ExportError
 from utility_viz.enums import ExportFormat
 
 
 def save_figure(
-    fig: MplFigure,
+    drawable: Any,
     *,
-    path: str,
-    dpi: int,
+    path: str | Path,
+    dpi: int | None = None,
     close: bool = False,
     unsupported_as_value_error: bool = False,
     transparent: bool = True,
-    **kwargs,
-) -> None:
-    """Save a matplotlib figure with consistent format validation and errors."""
+    **options: Any,
+) -> list[Path]:
+    """Save a Canvas/Figure through its MosaicKit-backed public API.
+
+    ``dpi`` is applied to canvas specs for this save only. ``close`` remains an
+    accepted compatibility argument but is unnecessary because render results
+    are created and closed inside MosaicKit's save operation.
+    """
+    target = Path(path)
     try:
-        fmt = ExportFormat.from_path(path)
+        ExportFormat.from_path(str(target))
     except ExportError as exc:
         if unsupported_as_value_error:
             raise ValueError(str(exc)) from None
         raise
+    if not hasattr(drawable, "save"):
+        raise ExportError("save_figure expects a utility_viz Canvas or Figure, not a backend figure")
 
-    tikz_scale = kwargs.pop("tikz_scale", None)
-    tikz_standalone = kwargs.pop("tikz_standalone", True)
-
+    canvases = getattr(drawable, "canvases", (drawable,))
+    previous = []
+    if dpi is not None:
+        for canvas in canvases:
+            previous.append(canvas.spec)
+            canvas.spec = canvas.spec.replace(dpi=dpi)
     try:
-        if fmt is ExportFormat.TEX:
-            from utility_viz.core.export.backend_tikz import save_tikz
-
-            save_tikz(
-                fig,
-                path,
-                scale=tikz_scale,
-                standalone=bool(tikz_standalone),
-            )
-            return
-
-        fig.savefig(
-            path,
-            dpi=dpi,
-            transparent=transparent,
-            bbox_inches=SAVEFIG_BBOX_INCHES,
-            **kwargs,
-        )
+        return drawable.save(target, transparent=transparent, **options)
     except OSError as exc:
-        raise ExportError(f"Failed to write '{path}': {exc}") from exc
+        raise ExportError(f"Failed to write '{target}': {exc}") from exc
     finally:
-        if close:
-            import matplotlib.pyplot as plt
-
-            plt.close(fig)
+        if dpi is not None:
+            for canvas, spec in zip(canvases, previous, strict=True):
+                canvas.spec = spec
+        _ = close

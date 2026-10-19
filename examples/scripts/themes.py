@@ -1,9 +1,5 @@
 """Render the same diagram under all built-in themes."""
 
-import matplotlib
-
-matplotlib.use("Agg")
-
 from pathlib import Path
 
 from utility_viz import Canvas, levels, solve, themes

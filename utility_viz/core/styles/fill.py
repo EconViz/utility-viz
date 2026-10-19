@@ -16,7 +16,7 @@ class Fill:
     Parameters
     ----------
     color : str, optional
-        Any Matplotlib colour. ``None`` follows the outline's colour.
+        Any supported named or hexadecimal colour. ``None`` follows the outline's colour.
     alpha : float, optional
         Shorthand for *opacity*.
     opacity : float, optional

@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
-from utility_viz.core.diagrams.consumer.edgeworth.style import apply_base_style
 from utility_viz.core.errors.exceptions import InvalidParameterError
 from utility_viz.core.styles.axis import Axis
 from utility_viz.core.styles.label import Label, split_label
@@ -25,9 +24,6 @@ from utility_viz.models.consumer.edgeworth_state import EdgeworthState
 from utility_viz.models.curves import around_anchor_levels
 
 if TYPE_CHECKING:
-    from matplotlib.axes import Axes
-    from matplotlib.figure import Figure
-
     from utility_viz.core.diagrams.consumer.edgeworth.box import EdgeworthBox
 
 _EPS = 1e-3
@@ -36,8 +32,6 @@ _EPS = 1e-3
 class BoxBase:
     """Attributes, state accessors and private helpers shared by the Edgeworth mixins."""
 
-    fig: Figure
-    ax: Axes
     utility_a: Callable[..., Any]
     utility_b: Callable[..., Any]
     total_x: float
@@ -46,7 +40,10 @@ class BoxBase:
     y_label: str
     title: str | None
     dpi: int
-    theme: Theme
+    legacy_theme: Theme
+    add: Callable[..., Any]
+    extend: Callable[..., Any]
+    _next_id: Callable[[str], str]
     box_stroke: Stroke
     x_side_stroke: Stroke
     y_side_stroke: Stroke
@@ -144,9 +141,6 @@ class BoxBase:
         self._state.equilibrium_focus_levels_b = value
 
     # --- numeric helpers ----------------------------------------------------------------------
-
-    def _apply_base_style(self) -> None:
-        apply_base_style(self)
 
     def _grid(self, *, res: int) -> tuple[np.ndarray, np.ndarray]:
         x = np.linspace(_EPS, self.total_x - _EPS, res)

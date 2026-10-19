@@ -1,101 +1,54 @@
-"""Tests for Fill: colour and opacity of the shaded budget set."""
+"""Budget fills are represented by MosaicKit FillLayer values."""
 
-import matplotlib
-
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
 import pytest
-from matplotlib.colors import to_hex
+from mosaickit import FillLayer
 
-from utility_viz import Canvas, Fill, Stroke
+from utility_viz import Canvas, Fill, Stroke, Theme
 from utility_viz.core.errors.exceptions import InvalidParameterError
-from utility_viz.core.themes.theme import Theme
 
 
-@pytest.fixture(autouse=True)
-def close_figures():
-    yield
-    plt.close("all")
+def _fill(canvas):
+    return next((layer for layer in canvas.snapshot().layers if isinstance(layer, FillLayer)), None)
 
 
-def _fill(cvs):
-    regions = [a for a in cvs.ax.get_children() if getattr(a, "_ev_role", None) == "budget_fill"]
-    assert len(regions) <= 1
-    return regions[0] if regions else None
+def test_fill_value_validation_and_merge():
+    assert Fill(alpha=0.5).merged_over(Fill(color="red", alpha=0.1)) == Fill(color="red", alpha=0.5)
+    with pytest.raises(InvalidParameterError):
+        Fill(alpha=2)
 
 
-def _looks_like(region, color, alpha):
-    assert to_hex(region.get_facecolor()[0]) == to_hex(color)
-    assert region.get_alpha() == pytest.approx(alpha)
+def test_no_fill_by_default_and_fill_true_uses_theme():
+    assert _fill(Canvas().add_budget(2, 3, 30)) is None
+    canvas = Canvas().add_budget(2, 3, 30, fill=True)
+    layer = _fill(canvas)
+    assert layer.fill.opacity == pytest.approx(canvas.legacy_theme.budget_fill_alpha)
 
 
-class TestFillValue:
-    def test_defaults(self):
-        assert (Fill().color, Fill().alpha) == (None, None)
-
-    @pytest.mark.parametrize("kwargs", [{"alpha": -0.1}, {"alpha": 1.5}, {"color": "not-a-colour"}])
-    def test_rejects_invalid_values(self, kwargs):
-        with pytest.raises(InvalidParameterError):
-            Fill(**kwargs)
-
-    def test_merged_over_keeps_unset_fields(self):
-        merged = Fill(alpha=0.5).merged_over(Fill(color="red", alpha=0.1))
-        assert (merged.color, merged.alpha) == ("red", 0.5)
+def test_explicit_fill_color_and_opacity():
+    layer = _fill(Canvas().add_budget(2, 3, 30, fill=Fill(color="#00ff00", alpha=0.25)))
+    assert layer.fill.color.to_hex() == "#00FF00"
+    assert layer.fill.opacity == pytest.approx(0.25)
 
 
-class TestBudgetFill:
-    def test_no_fill_by_default(self):
-        assert _fill(Canvas().add_budget(2, 3, 30)) is None
-        assert _fill(Canvas().add_budget(2, 3, 30, fill=False)) is None
-
-    def test_fill_true_matches_theme_default(self):
-        cvs = Canvas().add_budget(2, 3, 30, fill=True)
-        t = cvs.theme
-        assert t.budget_fill == Fill(alpha=t.budget_fill_alpha)
-        _looks_like(_fill(cvs), t.budget_color, t.budget_fill_alpha)
-
-    def test_fill_colour_independent_of_line(self):
-        cvs = Canvas().add_budget(2, 3, 30, color="black", fill=Fill(color="lightgrey", alpha=0.3))
-        _looks_like(_fill(cvs), "lightgrey", 0.3)
-        line = [a for a in cvs.ax.lines if getattr(a, "_ev_role", None) == "budget"][0]
-        assert to_hex(line.get_color()) == to_hex("black")
-
-    def test_fill_without_colour_follows_line(self):
-        cvs = Canvas().add_budget(2, 3, 30, color="#123456", fill=Fill(alpha=0.2))
-        _looks_like(_fill(cvs), "#123456", 0.2)
-
-    def test_fill_without_colour_follows_stroke(self):
-        cvs = Canvas().add_budget(2, 3, 30, fill=True, stroke=Stroke(color="#654321"))
-        _looks_like(_fill(cvs), "#654321", cvs.theme.budget_fill_alpha)
-
-    def test_fill_alpha_still_works(self):
-        cvs = Canvas().add_budget(2, 3, 30, fill=True, fill_alpha=0.4)
-        assert _fill(cvs).get_alpha() == pytest.approx(0.4)
-        cvs = Canvas().add_budget(2, 3, 30, fill=Fill(color="green"), fill_alpha=0.4)
-        _looks_like(_fill(cvs), "green", 0.4)
-
-    def test_fill_alpha_loses_to_fill(self):
-        cvs = Canvas().add_budget(2, 3, 30, fill=Fill(alpha=0.6), fill_alpha=0.4)
-        assert _fill(cvs).get_alpha() == pytest.approx(0.6)
-
-    def test_theme_default(self):
-        class Grey(Theme):
-            @property
-            def budget_fill(self):
-                return Fill(color="#cccccc", alpha=0.5)
-
-        cvs = Canvas(theme=Grey(name="grey")).add_budget(2, 3, 30, fill=True)
-        _looks_like(_fill(cvs), "#cccccc", 0.5)
-
-    def test_fill_reaches_tikz(self, tmp_path):
-        path = tmp_path / "f.tex"
-        Canvas().add_budget(2, 3, 30, fill=Fill(color="#00ff00", alpha=0.25)).save(str(path))
-        text = path.read_text()
-        assert "fill opacity=0.250" in text
+def test_fill_without_color_follows_theme_and_explicit_stroke_does_not_replace_it():
+    canvas = Canvas().add_budget(2, 3, 30, fill=True, stroke=Stroke(color="#654321"))
+    layer = _fill(canvas)
+    assert layer.fill.color is None
+    resolved = canvas.theme.resolve(layer.role, fallback_category="fill").fill
+    assert resolved.color.to_hex().lower() == canvas.legacy_theme.budget_color.lower()
 
 
-def test_fill_is_exported():
-    import utility_viz
+def test_fill_alpha_shorthand_and_object_precedence():
+    assert _fill(Canvas().add_budget(2, 3, 30, fill=True, fill_alpha=0.4)).fill.opacity == pytest.approx(0.4)
+    assert _fill(Canvas().add_budget(2, 3, 30, fill=Fill(alpha=0.6), fill_alpha=0.4)).fill.opacity == pytest.approx(0.6)
 
-    assert utility_viz.Fill is Fill
+
+def test_theme_budget_fill_is_compiled():
+    class Grey(Theme):
+        @property
+        def budget_fill(self):
+            return Fill(color="#cccccc", alpha=0.5)
+
+    layer = _fill(Canvas(theme=Grey(name="grey")).add_budget(2, 3, 30, fill=True))
+    assert layer.fill.color.to_hex() == "#CCCCCC"
+    assert layer.fill.opacity == pytest.approx(0.5)

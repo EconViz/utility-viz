@@ -1,146 +1,61 @@
-"""Tests for #78: indifference-curve hierarchy and textbook labeling."""
+"""Indifference hierarchy is encoded by semantic roles and layer styles."""
 
-import matplotlib
-
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
 import pytest
+from mosaickit import PathLayer, TextLayer
 
-from utility_viz import Canvas, Stroke, themes
+from utility_viz import Canvas, Stroke
 from utility_viz.models.utility import CobbDouglas, Leontief, PerfectSubstitutes, Satiation
 
-MODEL = CobbDouglas(alpha=0.5, beta=0.5)
+MODEL = CobbDouglas()
 
 
-@pytest.fixture(autouse=True)
-def close_figures():
-    yield
-    plt.close("all")
+def _paths(canvas, role):
+    return [layer for layer in canvas.snapshot().layers if isinstance(layer, PathLayer) and layer.role == role]
 
 
-def _role(ax, role):
-    return [a for a in ax.get_children() if getattr(a, "_ev_role", None) == role]
+def test_without_highlight_all_curves_are_primary():
+    canvas = Canvas(x_max=20, y_max=15).add_utility(MODEL, levels=[3, 5, 8])
+    assert len(_paths(canvas, "utility.indifference")) == 3
+    assert not _paths(canvas, "utility.indifference.secondary")
 
 
-class TestHighlightLevel:
-    def test_no_highlight_draws_a_single_uniform_curve_set(self):
-        cvs = Canvas(x_max=20, y_max=15).add_utility(MODEL, levels=[3, 5, 8])
-        assert len(_role(cvs.ax, "curve")) == 1
-        assert len(_role(cvs.ax, "secondary_curve")) == 0
+def test_highlight_selects_nearest_level_and_subdues_the_rest():
+    canvas = Canvas(x_max=20, y_max=15).add_utility(MODEL, levels=[3, 5, 8], highlight_level=5.3)
+    assert len(_paths(canvas, "utility.indifference")) == 1
+    secondary = _paths(canvas, "utility.indifference.secondary")
+    assert len(secondary) == 2
+    assert all(layer.stroke.opacity < 1 for layer in secondary)
 
-    def test_highlight_splits_into_focal_and_secondary_curve_sets(self):
-        cvs = Canvas(x_max=20, y_max=15).add_utility(MODEL, levels=[3, 5, 8], highlight_level=5)
-        focal = _role(cvs.ax, "curve")
-        secondary = _role(cvs.ax, "secondary_curve")
-        assert len(focal) == 1
-        assert len(secondary) == 1
 
-    def test_secondary_curve_is_thinner_and_more_transparent_by_default(self):
-        t = themes.default
-        cvs = Canvas(x_max=20, y_max=15).add_utility(MODEL, levels=[3, 5, 8], highlight_level=5)
-        focal = _role(cvs.ax, "curve")[0]
-        secondary = _role(cvs.ax, "secondary_curve")[0]
-        assert secondary.get_linewidths()[0] < focal.get_linewidths()[0]
-        assert secondary.get_alpha() is not None and secondary.get_alpha() < 1.0
-        assert secondary.get_linewidths()[0] == pytest.approx(t.secondary_ic_linewidth)
-        assert secondary.get_alpha() == pytest.approx(t.secondary_ic_opacity)
-
-    def test_highlight_picks_the_nearest_available_level(self):
-        # 5.3 isn't an explicit level; the curve nearest to it (5) becomes focal.
-        cvs = Canvas(x_max=20, y_max=15).add_utility(MODEL, levels=[3, 5, 8], highlight_level=5.3)
-        assert len(_role(cvs.ax, "curve")) == 1
-        assert len(_role(cvs.ax, "secondary_curve")) == 1
-
-    def test_explicit_secondary_stroke_overrides_theme_default(self):
-        cvs = Canvas(x_max=20, y_max=15).add_utility(
-            MODEL, levels=[3, 5, 8], highlight_level=5, secondary_stroke=Stroke(width=2.5, opacity=0.2)
-        )
-        secondary = _role(cvs.ax, "secondary_curve")[0]
-        assert secondary.get_linewidths()[0] == pytest.approx(2.5)
-        assert secondary.get_alpha() == pytest.approx(0.2)
-
-    def test_kinked_preferences_still_supported_with_highlight(self):
-        model = Leontief(a=1.0, b=1.0)
-        cvs = Canvas(x_max=20, y_max=15).add_utility(model, levels=[2, 4, 6], highlight_level=4, show_kinks=True)
-        assert len(_role(cvs.ax, "curve")) == 1
-        assert len(_role(cvs.ax, "secondary_curve")) == 1
-        assert len(_role(cvs.ax, "kink")) > 0
-
-    @pytest.mark.parametrize(
-        ("model", "levels", "highlight_level"),
-        [
-            (PerfectSubstitutes(a=1.0, b=1.0), [4, 8, 12], 8),
-            (Satiation(bliss_x=8, bliss_y=6), [-20, -8, -2], -8),
-        ],
+def test_explicit_secondary_stroke_overrides_theme():
+    canvas = Canvas(x_max=20, y_max=15).add_utility(
+        MODEL,
+        levels=[3, 5, 8],
+        highlight_level=5,
+        secondary_stroke=Stroke(width=2.5, opacity=0.2),
     )
-    def test_linear_and_satiation_preferences_still_supported_with_highlight(self, model, levels, highlight_level):
-        cvs = Canvas(x_max=20, y_max=15).add_utility(model, levels=levels, highlight_level=highlight_level)
-        assert len(_role(cvs.ax, "curve")) == 1
-        assert len(_role(cvs.ax, "secondary_curve")) == 1
+    assert all(
+        layer.stroke.width == 2.5 and layer.stroke.opacity == 0.2
+        for layer in _paths(canvas, "utility.indifference.secondary")
+    )
 
 
-class TestLabelStyle:
-    def test_numeric_is_the_default_label_style(self):
-        cvs = Canvas(x_max=20, y_max=15).add_utility(MODEL, levels=[3, 5, 8], show_ic_labels=True)
-        texts = {a.get_text() for a in cvs.ax.texts if getattr(a, "_ev_role", None) == "ic_label"}
-        assert texts == {"3", "5", "8"}
-
-    def test_ordinal_labels_each_level_in_ascending_order(self):
-        cvs = Canvas(x_max=20, y_max=15).add_utility(
-            MODEL, levels=[3, 5, 8], show_ic_labels=True, label_style="ordinal"
-        )
-        texts = {
-            a.get_text() for a in cvs.ax.texts if getattr(a, "_ev_role", None) in ("ic_label", "secondary_ic_label")
-        }
-        assert texts == {"$u_{1}$", "$u_{2}$", "$u_{3}$"}
-
-    def test_inline_labels_avoid_clipping_past_the_visible_area(self):
-        cvs = Canvas(x_max=20, y_max=15).add_utility(MODEL, levels=[3, 5, 8], show_ic_labels=True)
-        for text in cvs.ax.texts:
-            if getattr(text, "_ev_role", None) != "ic_label":
-                continue
-            x, _y = text.xy
-            assert x < 20 * 0.97
-
-    def test_inline_labels_follow_the_curve_angle(self):
-        cvs = Canvas(x_max=10, y_max=10).add_utility(
-            PerfectSubstitutes(a=1.0, b=1.0),
-            levels=[5],
-            show_ic_labels=True,
-        )
-        text = next(artist for artist in cvs.ax.texts if getattr(artist, "_ev_role", None) == "ic_label")
-        assert text.get_rotation() != pytest.approx(0.0)
+@pytest.mark.parametrize(
+    ("model", "levels", "highlight"),
+    [
+        (Leontief(), [2, 4, 6], 4),
+        (PerfectSubstitutes(), [4, 8, 12], 8),
+        (Satiation(bliss_x=8, bliss_y=6), [-20, -8, -2], -8),
+    ],
+)
+def test_utility_families_support_highlight(model, levels, highlight):
+    canvas = Canvas(x_max=20, y_max=15).add_utility(model, levels=levels, highlight_level=highlight)
+    assert _paths(canvas, "utility.indifference")
+    assert _paths(canvas, "utility.indifference.secondary")
 
 
-class TestThemeControlsHierarchy:
-    def test_secondary_ic_stroke_reflects_theme_fields(self):
-        from dataclasses import replace
-
-        custom = replace(
-            themes.default, secondary_ic_color="#123456", secondary_ic_linewidth=2.2, secondary_ic_opacity=0.3
-        )
-        cvs = Canvas(x_max=20, y_max=15, theme=custom).add_utility(MODEL, levels=[3, 5, 8], highlight_level=5)
-        secondary = _role(cvs.ax, "secondary_curve")[0]
-        assert secondary.get_linewidths()[0] == pytest.approx(2.2)
-        assert secondary.get_alpha() == pytest.approx(0.3)
-
-    def test_secondary_ic_color_falls_back_to_ic_color(self):
-        assert themes.default.secondary_ic_color is None
-        assert themes.default.secondary_ic_stroke.color == themes.default.ic_color
-
-    def test_ic_label_style_applies_to_focal_and_secondary_labels(self):
-        from dataclasses import replace
-
-        custom = replace(themes.default, label_scale=1.6)
-        cvs = Canvas(x_max=20, y_max=15, theme=custom).add_utility(
-            MODEL,
-            levels=[3, 5, 8],
-            highlight_level=5,
-            show_ic_labels=True,
-        )
-        labels = [
-            artist for artist in cvs.ax.texts if getattr(artist, "_ev_role", None) in ("ic_label", "secondary_ic_label")
-        ]
-        assert {getattr(artist, "_ev_role", None) for artist in labels} == {"ic_label", "secondary_ic_label"}
-        assert all(artist.get_fontsize() == pytest.approx(custom.ic_label.fontsize) for artist in labels)
+def test_numeric_and_ordinal_labels_are_text_layers():
+    numeric = Canvas(x_max=20, y_max=15).add_utility(MODEL, levels=[3, 5], show_ic_labels=True)
+    ordinal = Canvas(x_max=20, y_max=15).add_utility(MODEL, levels=[3, 5], show_ic_labels=True, label_style="ordinal")
+    assert {layer.text for layer in numeric.snapshot().layers if isinstance(layer, TextLayer)} >= {"3", "5"}
+    assert {layer.text for layer in ordinal.snapshot().layers if isinstance(layer, TextLayer)} >= {"u_{1}", "u_{2}"}

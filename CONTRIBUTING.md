@@ -60,16 +60,17 @@ which also forbids cycles and relative imports).
 
 ```
 utility_viz/
-  __init__.py      root facade (public API, lazy)               layer 10
-  cli/             command-line interface                       layer 9
-  models/          facade re-exporting the economic models      layer 9
+  __init__.py      root facade (public API, lazy)               layer 11
+  cli/             command-line interface                      layer 10
+  models/          facade re-exporting the economic models     layer 10
     utility/ curves/ consumer/ optimization/ analysis/          layers 2-4  (never import utility_viz.core drawing code)
   core/            drawing, styling, export, runtime (advanced/internal API)
     errors/ constants/                                          layer 0
     styles/ themes/ export/ config/ rendering/                  layers 2-4
-    diagrams/components/ scenes/                                layer 5
-    canvas/ layout/                                             layers 6-7
-    diagrams/consumer/ animation/ interactive/                  layer 8
+    scenes/                                                     layer 5
+    diagrams/components/                                       layer 6
+    canvas/ layout/                                             layers 7-8
+    diagrams/consumer/ animation/ interactive/                  layer 9
   enums/ utils/    shared internal areas                        layer 1
 ```
 
@@ -82,12 +83,12 @@ utility_viz/
 ## Adding a component on mosaickit scenes (2.0 pattern)
 
 New and migrated economic components build backend-neutral
-[mosaickit](https://pypi.org/project/mosaickit/) layers instead of mutating Matplotlib axes.
+[mosaickit](https://pypi.org/project/mosaickit/) layers instead of mutating renderer-owned axes.
 `utility_viz/core/scenes/` is the reference slice (budget, equilibrium, Cobb-Douglas
 indifference curves):
 
 1. **Economics stays in utility-viz.** Solving, contour-level selection and curve tracing
-   live under `models/` (no plotting library: bezierkit's `trace_implicit` via
+   live under `models/` (no renderer dependency: bezierkit's `trace_implicit` via
    `models.curves.trace_level_sets`, `percentile_levels` for level choice). A scene factory only receives results.
 2. **One factory per component** in `core/scenes/<component>.py`, returning a tuple of
    immutable layers (`PathLayer`, `FillLayer`, `MarkerLayer`, `TextLayer`) with stable ids
@@ -98,8 +99,9 @@ indifference curves):
    `utility.budget.compensated`, ...). A child role inherits its parent's fields, so only
    state what differs. Defaults go in `core/scenes/theme.py` (`utility_roles`), restating the
    legacy theme values; `tests/scenes/test_scene_theme.py` pins the parity.
-4. **No Matplotlib, no legacy drawing imports** in `core/scenes` or `models/curves`
-   (`tests/test_architecture.py` enforces it). Render with mosaickit:
+4. **No direct renderer imports and no legacy drawing stack.** Production code builds
+   MosaicKit scenes, while `models/curves` traces geometry with BezierKit;
+   `tests/test_architecture.py` enforces the boundary. Render with MosaicKit:
 
    ```python
    canvas = Canvas(CanvasSpec(x_range=(0, 18), y_range=(0, 12)), theme=UTILITY_THEME)
@@ -112,10 +114,9 @@ indifference curves):
 Geometry belongs to bezierkit and mosaickit stays curve-agnostic: curves are traced as
 `PiecewiseBezier` paths, sampled to points for the mosaickit `PathLayer`, and the source path
 is kept as `layer.model`. `core.scenes.canvas_to_tikz(canvas)` exports the same scene to TikZ
-(native `.. controls ..` paths via `bezierkit.export.tikz`, theme-resolved styles); mosaickit
-0.5.1 itself has no TikZ renderer. Limits: the traced field must be finite (undefined values
-are floored), Leontief kinks are rounded to within the tracing tolerance, and only path, fill,
-marker and text layers are exported.
+(native `.. controls ..` paths via `bezierkit.export.tikz`, theme-resolved styles). Limits: the
+traced field must be finite (undefined values are floored), traced kinks follow the grid tolerance,
+and only path, fill, marker and text layers are exported.
 
 ## Code style
 

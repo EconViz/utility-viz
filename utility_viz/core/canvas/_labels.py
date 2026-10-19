@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from utility_viz.core.constants.canvas import MATH_CHARS
-from utility_viz.core.rendering.labels import HAlign, VAlign
+from utility_viz.core.styles.placement import HAlign, VAlign
 from utility_viz.core.styles.stroke import Stroke
 from utility_viz.enums import ArrowStyle, LabelPosition, LineStyle
 
@@ -78,7 +78,7 @@ def _math_wrap(text: str) -> str:
 
     Segments already enclosed in ``$...$`` are left untouched.  Plain-text
     segments that contain any of ``^ _ { } \\`` are automatically wrapped so
-    that matplotlib renders them via its mathtext engine.
+    that the scene text renderer treats them as mathematical notation.
     """
     parts = re.split(r"(\$[^$]+\$)", text)
     out = []

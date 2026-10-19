@@ -8,10 +8,6 @@ Workflow
 3. Show intentional error: freeze leaving ≠ 2 active variables.
 """
 
-import matplotlib
-
-matplotlib.use("Agg")
-
 from pathlib import Path
 
 import numpy as np

@@ -1,35 +1,52 @@
-"""Pluggable value checks for styles that need a drawing backend.
-
-Styles are pure data and never import Matplotlib. Whether a colour string or a
-marker shape is valid is a backend question, so the rendering layer registers
-the checks when it is imported (see ``utility_viz.core.rendering.style_checks``).
-Until a check is registered the value is accepted and only the backend rejects it.
-"""
+"""Backend-neutral validation of public colour and marker-shape tokens."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import re
 
 from utility_viz.core.errors.exceptions import InvalidParameterError
 
-_color_check: Callable[[str], bool] | None = None
-_shape_check: Callable[[str], bool] | None = None
-
-
-def register_checks(*, color: Callable[[str], bool], shape: Callable[[str], bool]) -> None:
-    """Install the backend predicates for colour and marker-shape strings."""
-    global _color_check, _shape_check
-    _color_check = color
-    _shape_check = shape
+_COLORS = frozenset(
+    {
+        "black",
+        "white",
+        "red",
+        "green",
+        "blue",
+        "yellow",
+        "orange",
+        "purple",
+        "pink",
+        "brown",
+        "gray",
+        "grey",
+        "lightgray",
+        "lightgrey",
+        "darkgray",
+        "darkgrey",
+        "cyan",
+        "magenta",
+        "teal",
+        "navy",
+        "olive",
+        "maroon",
+        "gold",
+        "transparent",
+        "none",
+    }
+)
+_SHAPES = frozenset({"o", "s", "^", "v", "<", ">", "D", "d", "*", "+", "x", ".", ",", "p", "h", "H", "|", "_"})
 
 
 def check_color(owner: str, value: str | None) -> None:
     """Raise :class:`InvalidParameterError` if *value* is a colour the backend rejects."""
-    if value is not None and _color_check is not None and not _color_check(value):
+    valid = value is None or bool(re.fullmatch(r"#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?([0-9a-fA-F]{2})?", value))
+    valid = valid or (value is not None and value.lower() in _COLORS)
+    if not valid:
         raise InvalidParameterError(f"invalid {owner} color {value!r}")
 
 
 def check_shape(owner: str, value: str | None) -> None:
     """Raise :class:`InvalidParameterError` if *value* is a marker shape the backend rejects."""
-    if value is not None and _shape_check is not None and not _shape_check(value):
+    if value is not None and value not in _SHAPES:
         raise InvalidParameterError(f"invalid {owner} shape {value!r}")

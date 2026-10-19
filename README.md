@@ -54,14 +54,12 @@ cvs.save("cobb_douglas_eq.png")
 
 Without `theme=` the default colour-blind-friendly palette is used.
 
-TikZ export writes a standalone LaTeX document with only TikZ drawing commands:
+TikZ export writes a standalone LaTeX document from the same MosaicKit scene and
+BezierKit paths used for raster and vector output:
 
 ```python
-cvs.save("cobb_douglas.tex", tikz_scale=0.0125)
+cvs.save("cobb_douglas.tex")
 ```
-
-`tikz_scale` is centimetres per Matplotlib pixel (at 100 dpi); the default, `0.0125`, maps a 6 inch
-wide Matplotlib figure to 7.5 cm.
 
 ## Notebook
 
@@ -202,7 +200,7 @@ canvas.show_legend(legend=Legend(position="upper left", fontsize=10))
 ```
 
 Set a font for one canvas or a whole multi-panel figure without touching
-Matplotlib's global settings. Pass a family name, a generic family such as
+renderer-global settings. Pass a family name, a generic family such as
 `"serif"`, or a fallback list:
 
 ```python

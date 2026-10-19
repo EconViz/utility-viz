@@ -33,7 +33,7 @@ class Theme:
     label_scale : float
         Multiplier applied to the font size of every :class:`Label` property
         below that has one (``title_label`` and ``box_label`` follow
-        Matplotlib's own default size instead, so this doesn't reach them).
+        the renderer's own default size instead, so this doesn't reach them).
     ic_color : str
         Default colour for indifference curves.
     ic_linewidth : float
@@ -234,12 +234,12 @@ class Theme:
 
     @property
     def title_label(self) -> Label:
-        """Diagram titles. Font size ``None`` keeps Matplotlib's title size."""
+        """Diagram titles. Font size ``None`` keeps the renderer's title size."""
         return Label()
 
     @property
     def box_label(self) -> Label:
-        """Edgeworth box text: good names and the O_A / O_B origins. ``None`` keeps Matplotlib's size."""
+        """Edgeworth box text: good names and the O_A / O_B origins. ``None`` keeps the renderer's size."""
         return Label()
 
     @property

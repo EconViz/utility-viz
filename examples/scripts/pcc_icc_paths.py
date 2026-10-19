@@ -1,9 +1,5 @@
 """Generate PCC / ICC path examples for common core models."""
 
-import matplotlib
-
-matplotlib.use("Agg")
-
 from pathlib import Path
 
 import numpy as np

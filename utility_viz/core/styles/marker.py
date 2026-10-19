@@ -16,11 +16,11 @@ class Marker:
     Parameters
     ----------
     color : str, optional
-        Any Matplotlib colour; sets both the fill and the edge.
+        Any supported named or hexadecimal colour; sets both the fill and the edge.
     size : float, optional
         Marker size in points.
     shape : str, optional
-        Any Matplotlib marker, e.g. ``"o"``, ``"s"``, ``"^"``, ``"D"``, ``"*"``.
+        A supported marker shape, e.g. ``"o"``, ``"s"``, ``"^"``, ``"D"``, ``"*"``.
     opacity : float, optional
         From 0 (transparent) to 1 (opaque).
     """

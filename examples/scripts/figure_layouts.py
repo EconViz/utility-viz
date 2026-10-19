@@ -1,10 +1,8 @@
 """Demonstrate multi-panel Figure layouts."""
 
-import matplotlib
-
-matplotlib.use("Agg")
-
 from pathlib import Path
+
+from mosaickit import TextLayer
 
 from utility_viz import Figure, Layout, levels, solve
 from utility_viz.models import CobbDouglas
@@ -35,10 +33,19 @@ for idx, (model, (px, py, income), title) in enumerate(
     eq = solve(model, px=px, py=py, income=income)
     lvls = levels.around(eq.utility, n=5)
     panel = fig[idx]
-    panel.ax.set_title(title)
+    panel.add(
+        TextLayer(
+            (panel.x_max / 2, panel.y_max),
+            title,
+            id="panel.title",
+            role="title",
+            offset=(0, 12),
+            anchor="bottom",
+        )
+    )
     panel.add_utility(model, levels=lvls, label="IC")
     panel.add_budget(px, py, income, fill=True, label="BC")
     panel.add_equilibrium(eq, show_ray=True)
 
-fig[0].show_legend(loc="upper right")
+fig[0].show_legend()
 fig.save(f"{OUTPUT_DIR}/figure_side_by_side.png")

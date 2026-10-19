@@ -17,18 +17,17 @@ classifiers = [
 ]
 dependencies = [
     "numpy (>=1.24.0)",
-    "matplotlib (>=3.6.0,<4.0.0)",
     "scipy (>=1.13.0,<2.0.0)",
     "sympy (>=1.12.0,<2.0.0)",
     "tomli (>=2.0.0) ; python_version < '3.11'",
-    "mosaickit>=0.5.1,<0.6.0",
+    "mosaickit>=0.6.0,<0.7.0",
     "bezierkit>=1.0.1,<2.0.0",
 ]
 
 [project.optional-dependencies]
-animation   = ["Pillow (>=9.0.0)"]
+animation   = ["kinetickit[raster]>=1.0.0b2,<2.0.0"]
 interactive = ["ipywidgets (>=8.0.0)", "IPython (>=8.0.0)"]
-all         = ["Pillow (>=9.0.0)", "ipywidgets (>=8.0.0)", "IPython (>=8.0.0)"]
+all         = ["kinetickit[raster]>=1.0.0b2,<2.0.0", "ipywidgets (>=8.0.0)", "IPython (>=8.0.0)"]
 
 [project.scripts]
 utility-viz = "utility_viz.cli:main"

@@ -17,7 +17,7 @@ class LabelPosition(str, Enum):
 
 
 class ArrowStyle(str, Enum):
-    """Matplotlib-compatible arrowhead styles for canvas axes."""
+    """Arrowhead styles for canvas axes."""
 
     SIMPLE = "->"
     TRIANGLE = "-|>"
@@ -26,7 +26,7 @@ class ArrowStyle(str, Enum):
 
 
 class LineStyle(str, Enum):
-    """Matplotlib line styles for the axis lines."""
+    """Line styles for the canvas axes."""
 
     SOLID = "solid"
     DASHED = "dashed"
@@ -35,5 +35,5 @@ class LineStyle(str, Enum):
 
     @classmethod
     def _missing_(cls, value):
-        """Also accept Matplotlib's short forms: ``-``, ``--``, ``:``, ``-.``."""
+        """Also accept the conventional short forms: ``-``, ``--``, ``:``, ``-.``."""
         return {"-": cls.SOLID, "--": cls.DASHED, ":": cls.DOTTED, "-.": cls.DASHDOT}.get(value)

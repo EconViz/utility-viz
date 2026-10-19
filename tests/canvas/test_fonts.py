@@ -1,138 +1,45 @@
-"""Tests for per-canvas font configuration."""
+"""Font choices stay local to MosaicKit text styles."""
 
-import matplotlib
 import pytest
-from matplotlib.text import Text
+from mosaickit import TextLayer
 
-from utility_viz import Canvas, Figure, Layout, levels, solve
+from utility_viz import Canvas, Figure, Layout
 from utility_viz.core.errors.exceptions import InvalidParameterError
-from utility_viz.models.utility import CobbDouglas
 
 
-def _full_canvas(**kwargs) -> Canvas:
-    model = CobbDouglas(alpha=0.5, beta=0.5)
-    eq = solve(model, px=2.0, py=3.0, income=30.0)
-    cvs = Canvas(x_max=20, y_max=15, title="Title", **kwargs)
-    cvs.add_utility(model, levels=levels.around(eq.utility, n=3), label="IC", show_ic_labels=True)
-    cvs.add_budget(2.0, 3.0, 30.0, label="BC")
-    cvs.add_equilibrium(eq)
-    cvs.add_point(12.0, 2.0, label="A")
-    cvs.show_legend()
-    return cvs
+def _text_layers(canvas):
+    return [layer for layer in canvas.snapshot().layers if isinstance(layer, TextLayer)]
 
 
-def _visible_texts(fig) -> list[Text]:
-    return [t for t in fig.findobj(Text) if t.get_visible() and t.get_text()]
+def test_custom_font_applies_to_existing_and_late_text_layers():
+    canvas = Canvas(font="DejaVu Serif", title="Title").add_point(1, 1, label="late")
+    assert canvas.font == "DejaVu Serif"
+    assert all(layer.style.family == "DejaVu Serif" for layer in _text_layers(canvas))
 
 
-def test_default_canvas_keeps_matplotlib_font():
-    cvs = _full_canvas()
-    cvs.fig.canvas.draw()
-
-    assert cvs.font is None
-    default = list(matplotlib.rcParams["font.family"])
-    assert all(t.get_fontfamily() == default for t in _visible_texts(cvs.fig))
+def test_font_fallback_sequence_is_forwarded_without_system_font_discovery():
+    canvas = Canvas(font=["No Such Font UtilityViz", "serif"])
+    assert canvas.font == "No Such Font UtilityViz"
+    assert canvas.font_families == ("No Such Font UtilityViz", "serif")
 
 
-def test_custom_font_applies_to_every_text_element():
-    cvs = _full_canvas(font="DejaVu Serif")
-    cvs.fig.canvas.draw()
-
-    texts = _visible_texts(cvs.fig)
-    assert {"Title", "IC", "$BC$", "$0$", "$A$"} <= {t.get_text() for t in texts}
-    assert all(t.get_fontfamily() == ["DejaVu Serif"] for t in texts)
-
-
-def test_font_applies_to_layers_added_after_construction():
-    cvs = Canvas(font="serif")
-    cvs.add_point(1.0, 1.0, label="late")
-    cvs.fig.canvas.draw()
-
-    late = next(t for t in cvs.ax.texts if "late" in t.get_text())
-    assert late.get_fontfamily() == ["serif"]
+def test_figure_propagates_font_and_math_font():
+    figure = Figure(Layout.SIDE_BY_SIDE, font="serif", math_font="stix")
+    for panel in figure.canvases:
+        panel.add_point(1, 1, label="P")
+        assert panel.font == "serif"
+        assert panel.math_font == "stix"
+        math_layers = [layer for layer in _text_layers(panel) if layer.math]
+        assert math_layers and all(layer.style.family == "STIXGeneral" for layer in math_layers)
+        assert next(layer for layer in _text_layers(panel) if layer.id == "axes.origin.label").style.family == "serif"
 
 
-def test_font_does_not_change_global_rcparams():
-    before = list(matplotlib.rcParams["font.family"])
-    Canvas(font="DejaVu Serif").fig.canvas.draw()
-    assert list(matplotlib.rcParams["font.family"]) == before
-
-
-def test_font_accepts_fallback_list():
-    cvs = Canvas(font=["No Such Font UtilityViz", "DejaVu Serif"])
-    assert cvs.font == ("No Such Font UtilityViz", "DejaVu Serif")
-
-
-def test_missing_font_raises_clear_error():
-    with pytest.raises(InvalidParameterError, match="No Such Font UtilityViz"):
-        Canvas(font="No Such Font UtilityViz")
-
-
-def test_empty_font_is_rejected():
-    with pytest.raises(InvalidParameterError):
-        Canvas(font=[])
-
-
-def test_figure_propagates_font_to_all_panels():
-    fig = Figure(Layout.SIDE_BY_SIDE, title="Suptitle", font="DejaVu Serif")
-    for panel in fig.canvases:
-        panel.add_point(1.0, 1.0, label="P")
-    fig.fig.canvas.draw()
-
-    assert all(panel.font == ("DejaVu Serif",) for panel in fig.canvases)
-    texts = _visible_texts(fig.fig)
-    assert "Suptitle" in {t.get_text() for t in texts}
-    assert all(t.get_fontfamily() == ["DejaVu Serif"] for t in texts)
-
-
-@pytest.mark.parametrize("suffix", [".png", ".pdf", ".svg"])
-def test_custom_font_exports(tmp_path, suffix):
-    path = tmp_path / f"font{suffix}"
-    _full_canvas(font="DejaVu Serif").save(str(path))
-    assert path.stat().st_size > 0
-
-
-def test_tikz_maps_generic_serif_family(tmp_path):
-    path = tmp_path / "serif.tex"
-    Canvas(font="serif").save(str(path))
-    tex = path.read_text()
-    assert r"\rmfamily" in tex
-    assert r"\sffamily" not in tex
-
-
-def test_tikz_default_output_is_unchanged(tmp_path):
-    path = tmp_path / "default.tex"
-    Canvas().save(str(path))
-    tex = path.read_text()
-    assert r"\sffamily" in tex
-    assert r"\rmfamily" not in tex
-
-
-def test_math_font_applies_to_math_text_only():
-    cvs = _full_canvas(font="DejaVu Serif", math_font="stix")
-    cvs.fig.canvas.draw()
-
-    texts = _visible_texts(cvs.fig)
-    assert cvs.math_font == "stix"
-    assert all(t.get_math_fontfamily() == "stix" for t in texts)
-
-
-def test_default_math_font_is_unchanged():
-    cvs = _full_canvas(font="DejaVu Serif")
-    cvs.fig.canvas.draw()
-
-    default = matplotlib.rcParams["mathtext.fontset"]
-    assert all(t.get_math_fontfamily() == default for t in _visible_texts(cvs.fig))
-
-
-def test_invalid_math_font_is_rejected():
+def test_font_availability_is_left_to_the_renderer_but_math_tokens_are_validated():
+    assert Canvas(font="No Such Font UtilityViz").font == "No Such Font UtilityViz"
     with pytest.raises(InvalidParameterError, match="stix"):
         Canvas(math_font="comic")
 
 
-def test_figure_propagates_math_font():
-    fig = Figure(Layout.SIDE_BY_SIDE, math_font="cm")
-    fig.fig.canvas.draw()
-
-    assert all(panel.math_font == "cm" for panel in fig.canvases)
-    assert all(t.get_math_fontfamily() == "cm" for t in _visible_texts(fig.fig))
+def test_font_configuration_does_not_create_renderer_objects():
+    canvas = Canvas(font="serif", math_font="cm")
+    assert not hasattr(canvas, "fig") and not hasattr(canvas, "ax")

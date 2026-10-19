@@ -1,6 +1,7 @@
 """Behavioral tests for consumption-path rendering branches."""
 
 import pytest
+from mosaickit import LegendLayer, MarkerLayer, PathLayer
 
 from utility_viz import Canvas
 from utility_viz.models.consumer.paths import LinearBudget, PricePath
@@ -30,8 +31,13 @@ def test_path_can_render_curves_budgets_equilibria_and_legend(price_path):
         smooth_curve=True,
     ).show_legend()
 
-    assert canvas.ax.get_legend() is not None
-    assert len(canvas.ax.lines) > len(price_path.equilibria)
+    layers = canvas.snapshot().ordered_layers
+    assert any(isinstance(layer, LegendLayer) for layer in layers)
+    assert any(isinstance(layer, PathLayer) and layer.id.startswith("path.curve") for layer in layers)
+    assert len([layer for layer in layers if isinstance(layer, PathLayer) and ".budget." in layer.id]) == 3
+    assert (
+        len(next(layer for layer in layers if isinstance(layer, MarkerLayer) and layer.id == "path.points").points) == 3
+    )
 
 
 def test_inverted_path_can_render_raw_points(price_path):
@@ -47,6 +53,6 @@ def test_inverted_path_can_render_raw_points(price_path):
         smooth_curve=False,
     )
 
-    point_lines = [line for line in canvas.ax.lines if line.get_marker() == "o"]
-    assert len(point_lines) == len(price_path.equilibria)
-    assert point_lines[0].get_xdata()[0] == pytest.approx(price_path.parameter_values[0])
+    points = next(layer for layer in canvas.snapshot().ordered_layers if isinstance(layer, MarkerLayer))
+    assert len(points.points) == len(price_path.equilibria)
+    assert points.points[0][0] == pytest.approx(price_path.parameter_values[0])

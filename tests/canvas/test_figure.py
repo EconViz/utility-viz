@@ -1,7 +1,12 @@
 """Tests for multi-panel figures, paths, and linked demand diagrams."""
 
+import shutil
+import subprocess
+
 import numpy as np
 import pytest
+from bezierkit import PiecewiseBezier
+from mosaickit import FillLayer, LegendLayer, MarkerLayer, PathLayer, TextLayer
 
 from utility_viz import (
     ArrowStyle,
@@ -14,6 +19,7 @@ from utility_viz import (
     LinearBudget,
     PricePath,
 )
+from utility_viz.core.errors.exceptions import InvalidParameterError
 from utility_viz.models.utility import CES, CobbDouglas, Leontief, PerfectSubstitutes, QuasiLinear, StoneGeary
 
 
@@ -56,14 +62,16 @@ class TestFigure:
         fig[0].add_utility(CobbDouglas(), levels=3)
         fig[0].add_budget(px=2.0, py=3.0, income=30.0, fill=True)
         fig[1].add_point(2.0, 3.0, label="A")
-        assert len(fig[0].ax.collections) >= 1
-        assert len(fig[0].ax.lines) >= 1
-        assert len(fig[1].ax.lines) >= 1
+        assert any(isinstance(layer, FillLayer) for layer in fig[0].snapshot().layers)
+        assert any(isinstance(layer, PathLayer) for layer in fig[0].snapshot().layers)
+        assert any(isinstance(layer, MarkerLayer) for layer in fig[1].snapshot().layers)
 
-    def test_shared_axes_link_matplotlib_axes(self):
+    def test_shared_axes_share_ranges_and_hide_duplicate_labels(self):
         fig = Figure(Layout.SIDE_BY_SIDE, shared_x=True, shared_y=True)
-        assert fig[0].ax.get_shared_x_axes().joined(fig[0].ax, fig[1].ax)
-        assert fig[0].ax.get_shared_y_axes().joined(fig[0].ax, fig[1].ax)
+        assert fig[0].spec.x_range == fig[1].spec.x_range
+        assert fig[0].spec.y_range == fig[1].spec.y_range
+        assert "axes.y.label" in {layer.id for layer in fig[0].snapshot().layers}
+        assert "axes.y.label" not in {layer.id for layer in fig[1].snapshot().layers}
 
     def test_axis_customization_is_forwarded_to_every_panel(self):
         fig = Figure(
@@ -85,6 +93,53 @@ class TestFigure:
         Figure(Layout.SINGLE).save(str(out))
         assert out.exists()
         assert r"\begin{tikzpicture}" in out.read_text(encoding="utf-8")
+
+    def test_title_is_a_scene_layer_and_tikz_preserves_layout(self, tmp_path):
+        out = tmp_path / "multi.tex"
+        fig = Figure(Layout.TOP_TWO_BOTTOM_ONE, title="Welfare")
+        titles = [layer for canvas in fig.canvases for layer in canvas.snapshot().layers if layer.id == "figure.title"]
+        assert len(titles) == 1 and isinstance(titles[0], TextLayer)
+        fig.save(out)
+        source = out.read_text(encoding="utf-8")
+        assert source.count(r"\begin{tikzpicture}") == 3
+        assert r"\begin{center}" in source
+        assert r"\hspace{1em}" in source
+        assert "% row 2 of 2" in source
+
+    @pytest.mark.parametrize(
+        "layout,panel_index,x",
+        [
+            (Layout.SIDE_BY_SIDE, 0, 10.0),
+            (Layout.TOP_ONE_BOTTOM_TWO, 0, 5.0),
+            (Layout.GRID_3X3, 1, 5.0),
+        ],
+    )
+    def test_title_is_centered_across_grid_columns(self, layout, panel_index, x):
+        fig = Figure(layout, title="Welfare")
+        title = next(layer for layer in fig[panel_index].snapshot().layers if layer.id == "figure.title")
+        assert title.position == (x, 10.0)
+
+    def test_non_default_grid_spacing_fails_instead_of_becoming_a_noop(self):
+        with pytest.raises(InvalidParameterError, match="hspace/wspace"):
+            Figure(Layout.SINGLE, hspace=0.5)
+
+    def test_tikz_rejects_unknown_renderer_options(self, tmp_path):
+        with pytest.raises(TypeError, match="unsupported TikZ"):
+            Figure(Layout.SINGLE).save(tmp_path / "bad.tex", transparent=True)
+
+    @pytest.mark.skipif(shutil.which("pdflatex") is None, reason="pdflatex is not installed")
+    def test_multi_panel_tikz_compiles(self, tmp_path):
+        target = tmp_path / "multi.tex"
+        Figure(Layout.TOP_TWO_BOTTOM_ONE, title="Welfare").save(target)
+        result = subprocess.run(
+            ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", target.name],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert result.returncode == 0, result.stdout[-2000:]
+        assert (tmp_path / "multi.pdf").stat().st_size > 0
 
 
 class TestConsumptionPaths:
@@ -118,25 +173,23 @@ class TestConsumptionPaths:
         budget = LinearBudget(px=2.0, py=2.0, income=40.0)
         path = PricePath(CobbDouglas(alpha=0.5, beta=0.5), budget=budget, price="px", price_range=(1.0, 4.0), n=4)
         canvas = Canvas(x_max=25, y_max=25)
-        before = len(canvas.ax.lines)
         canvas.add_path(path)
-        assert len(canvas.ax.lines) == before + 1
-        assert len(canvas.ax.lines[-1].get_xdata()) > len(path.equilibria)
-        curve_xs = canvas.ax.lines[-1].get_xdata()
-        assert curve_xs.min() < min(path.x_values)
-        assert curve_xs.max() > max(path.x_values)
+        layer = next(layer for layer in canvas.snapshot().layers if layer.id == "path")
+        assert isinstance(layer, PathLayer)
+        assert isinstance(layer.model, PiecewiseBezier)
+        assert len(layer.path) > len(path.equilibria)
+        assert not any(
+            isinstance(item, MarkerLayer) and item.id.startswith("path") for item in canvas.snapshot().layers
+        )
 
     def test_income_path_defaults_to_single_smooth_curve_without_markers(self):
         budget = LinearBudget(px=2.0, py=2.0, income=40.0)
         path = IncomePath(CobbDouglas(alpha=0.5, beta=0.5), budget=budget, income_range=(10.0, 40.0), n=4)
         canvas = Canvas(x_max=25, y_max=25)
-        before = len(canvas.ax.lines)
         canvas.add_path(path)
-        assert len(canvas.ax.lines) == before + 1
-        assert len(canvas.ax.lines[-1].get_xdata()) > len(path.equilibria)
-        curve_xs = canvas.ax.lines[-1].get_xdata()
-        assert curve_xs.min() < min(path.x_values)
-        assert curve_xs.max() > max(path.x_values)
+        layer = next(layer for layer in canvas.snapshot().layers if layer.id == "path")
+        assert isinstance(layer.model, PiecewiseBezier)
+        assert len(layer.path) > len(path.equilibria)
 
 
 class TestDemandDiagram:
@@ -222,10 +275,43 @@ class TestDemandDiagram:
             n=20,
         )
         fig = DemandDiagram(path)
-        before = len(fig.demand_canvas.ax.lines)
         fig.add_marshallian_panel(price_markers=[2.0, 4.0], show_demand_guides=True)
-        after = len(fig.demand_canvas.ax.lines)
-        assert after >= before + 6
+        guides = [layer for layer in fig.demand_canvas.snapshot().layers if layer.id.startswith("demand.guide.")]
+        assert len(guides) == 4
+        assert all(isinstance(layer, PathLayer) for layer in guides)
+
+    def test_selected_demand_points_are_emitted_once_and_labeled(self):
+        path = PricePath(
+            CobbDouglas(),
+            budget=LinearBudget(px=2.0, py=2.0, income=40.0),
+            price="px",
+            price_range=(1.0, 4.0),
+            n=20,
+        )
+        fig = DemandDiagram(path).add_marshallian_panel(price_markers=[2.0, 4.0])
+        markers = [layer for layer in fig.demand_canvas.snapshot().layers if isinstance(layer, MarkerLayer)]
+        assert [layer.id for layer in markers].count("demand.points") == 1
+        assert sum(len(layer.points) for layer in markers if layer.id == "demand.points") == 2
+        assert {layer.text for layer in fig.demand_canvas.snapshot().layers if layer.id.endswith(".label")} >= {
+            "A",
+            "B",
+        }
+
+    def test_selected_budgets_use_solid_then_dashed_styles(self):
+        path = PricePath(
+            CobbDouglas(),
+            budget=LinearBudget(px=2.0, py=2.0, income=40.0),
+            price="px",
+            price_range=(1.0, 4.0),
+            n=20,
+        )
+        fig = DemandDiagram(path).add_marshallian_panel(price_markers=[2.0, 4.0])
+        budgets = [
+            layer
+            for layer in fig.utility_canvas.snapshot().ordered_layers
+            if isinstance(layer, PathLayer) and layer.id.startswith("budget")
+        ]
+        assert [layer.stroke.dash.value for layer in budgets] == ["solid", "dashed"]
 
     def test_perfect_substitutes_demand_breaks_at_tie(self):
         path = PricePath(
@@ -237,24 +323,11 @@ class TestDemandDiagram:
         )
         fig = DemandDiagram(path)
         fig.add_marshallian_panel(price_markers=[1.2, 3.0])
-        horizontal_segments = [
-            line
-            for line in fig.demand_canvas.ax.lines
-            if len(line.get_xdata()) == 2 and len(set(line.get_ydata())) == 1
-        ]
-        assert horizontal_segments
-        tie_markers = [
-            line
-            for line in fig.demand_canvas.ax.lines
-            if len(line.get_xdata()) == 1
-            and np.isclose(line.get_xdata()[0], 20.0)
-            and np.isclose(line.get_ydata()[0], 2.0)
-        ]
-        assert tie_markers
-        assert tie_markers[0].get_marker() == "o"
-        assert tie_markers[0].get_color() == fig.demand_canvas.theme.ic_color
-        assert tie_markers[0].get_clip_on() is False
-        assert tie_markers[0].get_zorder() > horizontal_segments[0].get_zorder()
+        layers = {layer.id: layer for layer in fig.demand_canvas.snapshot().layers}
+        assert tuple(layers["demand.curve.tie"].path) == ((0.0, 2.0), (20.0, 2.0))
+        assert isinstance(layers["demand.tie"], MarkerLayer)
+        assert layers["demand.tie"].points == ((20.0, 2.0),)
+        assert layers["demand.tie"].z_index > layers["demand.curve.tie"].z_index
 
     def test_demand_markers_are_not_clipped_and_draw_above_lines(self):
         path = PricePath(
@@ -266,19 +339,11 @@ class TestDemandDiagram:
         )
         fig = DemandDiagram(path)
         fig.add_marshallian_panel(price_markers=[3.0])
-        point_markers = [
-            line
-            for line in fig.demand_canvas.ax.lines
-            if len(line.get_xdata()) == 1
-            and line.get_marker() == "o"
-            and np.isclose(line.get_xdata()[0], 0.0)
-            and np.isclose(line.get_ydata()[0], 3.0)
-        ]
-        assert point_markers
-        assert point_markers[0].get_clip_on() is False
-        curve_lines = [line for line in fig.demand_canvas.ax.lines if len(line.get_xdata()) > 1]
-        assert curve_lines
-        assert point_markers[0].get_zorder() > curve_lines[0].get_zorder()
+        layers = fig.demand_canvas.snapshot().layers
+        point_markers = [layer for layer in layers if isinstance(layer, MarkerLayer) and layer.id == "demand.points"]
+        curves = [layer for layer in layers if isinstance(layer, PathLayer) and layer.id.startswith("demand.curve")]
+        assert point_markers and curves
+        assert point_markers[0].z_index > max(layer.z_index for layer in curves)
 
     def test_marshallian_panel_can_hide_legends(self):
         path = PricePath(
@@ -290,8 +355,8 @@ class TestDemandDiagram:
         )
         fig = DemandDiagram(path)
         fig.add_marshallian_panel(price_markers=[2.0, 4.0], show_legend=False)
-        assert fig.utility_canvas.ax.get_legend() is None
-        assert fig.demand_canvas.ax.get_legend() is None
+        assert not any(isinstance(layer, LegendLayer) for layer in fig.utility_canvas.snapshot().layers)
+        assert not any(isinstance(layer, LegendLayer) for layer in fig.demand_canvas.snapshot().layers)
 
     def test_goods_canvas_uses_wider_padding(self):
         path = PricePath(
@@ -315,9 +380,9 @@ class TestDemandDiagram:
         )
         fig = DemandDiagram(path)
         fig.add_marshallian_panel(show_pcc=True)
-        pcc_line = fig.utility_canvas.ax.lines[-1]
-        assert pcc_line.get_color() == fig.utility_canvas.theme.path_color
-        assert fig.utility_canvas.theme.path_color != fig.utility_canvas.theme.ic_color
+        pcc = next(layer for layer in fig.utility_canvas.snapshot().layers if layer.id == "path")
+        assert pcc.stroke.color.to_hex().lower() == fig.utility_canvas.legacy_theme.path_color.lower()
+        assert fig.utility_canvas.legacy_theme.path_color != fig.utility_canvas.legacy_theme.ic_color
 
 
 def test_figure_forwards_axis_line_styles():

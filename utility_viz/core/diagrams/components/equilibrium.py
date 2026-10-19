@@ -1,38 +1,15 @@
-"""Equilibrium point component."""
+"""Reusable scene component for an equilibrium annotation."""
 
 from __future__ import annotations
 
-from utility_viz.core.rendering.stroke import tag, tag_attr
-from utility_viz.core.styles.label import Label
-from utility_viz.enums import LabelPosition
-from utility_viz.utils.logging import get_logger
+from mosaickit import DashStyle, Marker, Stroke
 
-logger = get_logger(__name__)
+from utility_viz.core.scenes.equilibrium import equilibrium_layers
+
+_DASH = {"-": DashStyle.SOLID, "--": DashStyle.DASHED, ":": DashStyle.DOTTED, "-.": DashStyle.DASHDOT}
 
 
 class EquilibriumPoint:
-    """Renders an equilibrium bundle annotation on the canvas.
-
-    Parameters
-    ----------
-    eq : Equilibrium
-        A pre-solved equilibrium bundle.
-    color : str
-        Colour for the marker and drop-lines.
-    markersize : float
-        Size of the equilibrium dot.
-    label : str or None
-        LaTeX label placed next to the dot.
-    drop_dashes : bool
-        Draw dashed perpendicular lines from the optimum to both axes.
-    show_ray : bool
-        Draw the expansion-path ray from the origin through the optimum.
-    ray_color : str
-        Colour for the expansion-path ray.
-    ray_linewidth : float
-        Stroke width for the expansion-path ray.
-    """
-
     def __init__(
         self,
         eq,
@@ -46,62 +23,26 @@ class EquilibriumPoint:
         marker_shape: str = "o",
         drop_linestyle: str = ":",
         ray_linestyle: str = "--",
-    ):
-        self.eq = eq
-        self.color = color
-        self.markersize = markersize
-        self.label = label
-        self.drop_dashes = drop_dashes
-        self.show_ray = show_ray
-        self.ray_color = ray_color or color
-        self.ray_linewidth = ray_linewidth
-        self.marker_shape = marker_shape
-        self.drop_linestyle = drop_linestyle
-        self.ray_linestyle = ray_linestyle
+    ) -> None:
+        self.eq, self.color, self.markersize, self.label = eq, color, markersize, label
+        self.drop_dashes, self.show_ray = drop_dashes, show_ray
+        self.ray_color, self.ray_linewidth = ray_color or color, ray_linewidth
+        self.marker_shape, self.drop_linestyle, self.ray_linestyle = marker_shape, drop_linestyle, ray_linestyle
 
-    def draw(self, ax, x_max: float, y_max: float) -> None:
-        """Draw the equilibrium annotation onto *ax*."""
-        from utility_viz.core.diagrams.components import draw_ray
-
-        eq = self.eq
-        logger.info(
-            "Equilibrium (%s): x=%.4f, y=%.4f, U=%.4f",
-            eq.bundle_type,
-            eq.x,
-            eq.y,
-            eq.utility,
-        )
-
-        (point,) = ax.plot(
-            eq.x, eq.y, self.marker_shape, color=self.color, markersize=self.markersize, clip_on=False, zorder=6
-        )
-        tag(point, "equilibrium")
-        if self.label:
-            text = ax.annotate(
-                rf"${self.label}$",
-                (eq.x, eq.y),
-                textcoords="offset points",
-                xytext=(5, 5),
-                fontsize=12,
-                color=self.color,
-                zorder=7,
-            )
-            tag(text, "equilibrium_label")
-            tag_attr(text, "_ev_label_default", Label(position=LabelPosition.TOP_RIGHT, offset=5))
-
-        if self.drop_dashes:
-            dash_kw = dict(color=self.color, linestyle=self.drop_linestyle, linewidth=0.8)
-            for xs, ys in (([eq.x, eq.x], [0, eq.y]), ([0, eq.x], [eq.y, eq.y])):
-                (line,) = ax.plot(xs, ys, **dash_kw)
-                tag(line, "drop")
-
-        if self.show_ray and eq.x > 1e-9:
-            draw_ray(
-                ax,
-                eq.y / eq.x,
-                x_max,
-                y_max,
+    def layers(self, x_max: float, y_max: float):
+        return equilibrium_layers(
+            self.eq,
+            label=self.label,
+            drop_lines=self.drop_dashes,
+            ray_to=(x_max, y_max) if self.show_ray else None,
+            marker=Marker(color=self.color, size=self.markersize**2, shape=self.marker_shape),
+            drop_stroke=Stroke(color=self.color, width=0.8, dash=_DASH[self.drop_linestyle]),
+            ray_stroke=Stroke(
                 color=self.ray_color,
-                linewidth=self.ray_linewidth,
-                linestyle=self.ray_linestyle,
-            )
+                width=self.ray_linewidth,
+                dash=_DASH[self.ray_linestyle],
+            ),
+        )
+
+    def draw(self, canvas, x_max: float, y_max: float) -> None:
+        canvas.extend(self.layers(x_max, y_max))

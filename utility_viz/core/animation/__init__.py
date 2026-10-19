@@ -18,10 +18,10 @@ Usage::
 
     Animator(draw, frames=np.linspace(1, 8, 40)).save("sweep.gif", fps=12)
 
-Requires ``Pillow``::
+Requires ``KineticKit`` with raster export support::
 
     pip install utility-viz[animation]
-    # or: pip install Pillow
+    # or: pip install 'kinetickit[raster]'
 """
 
 from utility_viz.core.animation.animator import Animator

@@ -22,16 +22,12 @@ Output is written to ``examples/output/animation/``.
 from __future__ import annotations
 
 import argparse
-
-import matplotlib
-
-matplotlib.use("Agg")
-
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
+from mosaickit import TextLayer
 
 from utility_viz import Canvas, levels, solve
 from utility_viz.core.animation import Animator
@@ -58,10 +54,6 @@ INCOME_SPEED = DEFAULT_SPEED
 INCOME_MIN = 8.0
 INCOME_MAX = 36.0
 FIGURE_SIZE = (7.6, 6.4)
-AXES_RIGHT = 0.76
-DYNAMIC_INFO_X = 0.80
-DYNAMIC_INFO_TITLE_Y = 0.88
-DYNAMIC_INFO_BODY_Y = 0.84
 
 
 # Replaced by the real frames once _build_parameter_frames is defined below.
@@ -172,27 +164,28 @@ for idx, spec in enumerate(SPECS):
 
 
 def _add_frame_metadata(canvas: Canvas, *lines: str) -> Canvas:
-    """Attach a compact multi-line metadata block in a right-side panel."""
-    canvas.fig.text(
-        DYNAMIC_INFO_X,
-        DYNAMIC_INFO_TITLE_Y,
-        "Dynamic Info",
-        ha="left",
-        va="top",
-        fontsize=11.5,
-        fontweight="semibold",
-        color=canvas.theme.label_color,
-        zorder=9,
+    """Attach compact frame metadata as scene text."""
+    canvas.add(
+        TextLayer(
+            (canvas.x_max, canvas.y_max),
+            "Dynamic Info",
+            id="animation.metadata.title",
+            role="title",
+            offset=(-8, -8),
+            anchor="top-right",
+            z_index=9,
+        )
     )
-    canvas.fig.text(
-        DYNAMIC_INFO_X,
-        DYNAMIC_INFO_BODY_Y,
-        "\n".join(lines),
-        ha="left",
-        va="top",
-        fontsize=10.5,
-        color=canvas.theme.label_color,
-        zorder=9,
+    canvas.add(
+        TextLayer(
+            (canvas.x_max, canvas.y_max),
+            "\n".join(lines),
+            id="animation.metadata.body",
+            role="axes",
+            offset=(-8, -28),
+            anchor="top-right",
+            z_index=9,
+        )
     )
     return canvas
 
@@ -248,8 +241,7 @@ def _make_animation_canvas(title: str) -> Canvas:
         title=title,
         dpi=120,
     )
-    canvas.fig.set_size_inches(*FIGURE_SIZE)
-    canvas.fig.subplots_adjust(left=0.10, right=AXES_RIGHT, top=0.90, bottom=0.10)
+    canvas.spec = canvas.spec.replace(width=FIGURE_SIZE[0], height=FIGURE_SIZE[1])
     return canvas
 
 

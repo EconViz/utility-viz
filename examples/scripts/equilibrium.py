@@ -4,10 +4,6 @@ Workflow: solve → compute levels from solution → draw.
 The levels module ensures the equilibrium IC is always one of the drawn curves.
 """
 
-import matplotlib
-
-matplotlib.use("Agg")
-
 from pathlib import Path
 
 from utility_viz import Canvas, levels, solve

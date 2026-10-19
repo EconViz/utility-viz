@@ -3,13 +3,9 @@
 from pathlib import Path
 from typing import Any
 
-import matplotlib
-
-matplotlib.use("Agg")
-
 import numpy as np
 
-from utility_viz import EdgeworthBox, EquilibriumFocusConfig, themes
+from utility_viz import EdgeworthBox, EquilibriumFocusConfig, Legend, themes
 from utility_viz.models import (
     CES,
     CobbDouglas,
@@ -64,7 +60,7 @@ def _render_case(
                 res=300,
             ),
         )
-        .show_legend(loc="center left", bbox_to_anchor=(1.02, 0.5))
+        .show_legend(Legend(position="right"))
         .save(str(OUTPUT_DIR / filename))
     )
 

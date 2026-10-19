@@ -1,4 +1,4 @@
-"""Placing text beside a point: offsets and alignment for each LabelPosition."""
+"""Renderer-neutral placement of text beside a point."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from utility_viz.enums import LabelPosition
 HAlign = Literal["left", "center", "right"]
 VAlign = Literal["bottom", "baseline", "center", "center_baseline", "top"]
 
-# Unit direction from the point to the text, then horizontal / vertical alignment.
 LAYOUT: dict[LabelPosition, tuple[tuple[float, float], HAlign, VAlign]] = {
     LabelPosition.TOP: ((0, 1), "center", "bottom"),
     LabelPosition.BOTTOM: ((0, -1), "center", "top"),
@@ -23,9 +22,6 @@ LAYOUT: dict[LabelPosition, tuple[tuple[float, float], HAlign, VAlign]] = {
 
 
 def placement(position: LabelPosition, offset: float) -> tuple[tuple[float, float], HAlign, VAlign]:
-    """Return ``(xytext in points, ha, va)`` for a label *offset* points away on *position*'s side.
-
-    Corners move *offset* along each axis, matching the ``(5, 5)`` default of point labels.
-    """
-    (dx, dy), ha, va = LAYOUT[position]
-    return (dx * offset, dy * offset), ha, va
+    """Return the point offset and horizontal/vertical alignment."""
+    (dx, dy), horizontal, vertical = LAYOUT[position]
+    return (dx * offset, dy * offset), horizontal, vertical

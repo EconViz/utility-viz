@@ -19,6 +19,9 @@ from utility_viz.core.scenes.roles import Budget, Equilibrium, Indifference
 class UtilityColors:
     """Colour and weight inputs of the utility theme (legacy ``Theme`` field names)."""
 
+    axis_color: str = "#222222"
+    label_color: str = "#222222"
+    background_color: str | None = None
     ic_color: str = "#377EB8"
     ic_linewidth: float = 1.8
     secondary_ic_color: str | None = None
@@ -57,7 +60,6 @@ def utility_roles(colors: UtilityColors | None = None) -> dict[str, StyleBundle]
         Equilibrium.MAIN.value: StyleBundle(
             marker=Marker(
                 color=c.eq_color,
-                # mosaickit's Marker.size is an area (points squared); ours is a diameter.
                 size=c.eq_markersize**2,
                 shape="o",
                 edge_color=c.eq_color,
@@ -82,9 +84,26 @@ def utility_roles(colors: UtilityColors | None = None) -> dict[str, StyleBundle]
     }
 
 
+def _surface_roles(c: UtilityColors) -> dict[str, StyleBundle]:
+    """MosaicKit's undotted built-in surface roles, kept out of domain registration."""
+    return {
+        "canvas": StyleBundle(
+            fill=Fill(
+                color=c.background_color or "white",
+                opacity=1.0 if c.background_color is not None else 0.0,
+            )
+        ),
+        "axes": StyleBundle(
+            stroke=Stroke(color=c.axis_color, width=1.0),
+            text=TextStyle(color=c.label_color),
+        ),
+    }
+
+
 def utility_theme(colors: UtilityColors | None = None, *, name: str = "utility") -> Theme:
     """The mosaickit default theme extended with the utility-viz roles."""
-    return Theme(name, {**default.roles, **utility_roles(colors)})
+    c = colors or UtilityColors()
+    return Theme(name, {**default.roles, **_surface_roles(c), **utility_roles(c)})
 
 
 UTILITY_THEME = utility_theme()

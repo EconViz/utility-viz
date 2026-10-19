@@ -1,66 +1,22 @@
-"""Indifference curve component."""
+"""Reusable scene component for indifference curves."""
 
 from __future__ import annotations
 
-import numpy as np
+from dataclasses import replace
+
+from mosaickit import DashStyle, MarkerLayer, PathLayer, Stroke
+from mosaickit import Marker as MosaicMarker
 
 from utility_viz.core.constants.canvas import CONTOUR_DOMAIN_MIN
-from utility_viz.core.diagrams.components._corners import repair_contour_set
-from utility_viz.core.rendering.stroke import tag, tag_attr
-from utility_viz.core.styles.label import Label
-from utility_viz.enums import LabelPosition, UtilityType
+from utility_viz.core.scenes.indifference import indifference_layers
+from utility_viz.core.styles.marker import Marker
+from utility_viz.core.styles.stroke import Stroke as PublicStroke
+from utility_viz.enums import UtilityType
+from utility_viz.models.curves import Layer as ContourGrid
 from utility_viz.models.curves import percentile_levels
-from utility_viz.utils.logging import get_logger
-
-logger = get_logger(__name__)
-
-
-def _label_angle(ax, segment: np.ndarray, index: int) -> float:
-    """Return the local contour angle in display coordinates, kept upright."""
-    if len(segment) < 2:
-        return 0.0
-    before = max(0, index - 1)
-    after = min(len(segment) - 1, index + 1)
-    start, end = ax.transData.transform([segment[before], segment[after]])
-    angle = float(np.degrees(np.arctan2(end[1] - start[1], end[0] - start[0])))
-    return (angle + 90.0) % 180.0 - 90.0
 
 
 class IndifferenceCurves:
-    """Renders a family of indifference curves for a utility function.
-
-    Parameters
-    ----------
-    func : UtilityFunction
-        Utility model conforming to the protocol.
-    levels : int or list[float]
-        Number of auto-spaced levels, or an explicit list of utility values.
-    color, linewidth : str, float
-        Curve appearance.
-    show_rays : bool
-        Draw kink-locus rays (only for KINKED utility types).
-    ray_color, ray_linewidth : str, float
-        Ray appearance.
-    show_kinks : bool
-        Draw markers at kink points (only for KINKED utility types).
-    kink_color : str
-        Kink marker colour.
-    kink_radius : float
-        Kink marker size factor.
-    subsistence_color, subsistence_linewidth : str, float
-        Appearance of Stone-Geary subsistence reference lines.
-    highlight_level : float, optional
-        Utility level to draw with full ``color``/``linewidth`` weight; every
-        other level is drawn subdued, using *secondary_color* /
-        *secondary_linewidth* / *secondary_opacity*. ``None`` draws every
-        level with the same weight (unchanged default behaviour).
-    secondary_color, secondary_linewidth, secondary_opacity : str, float, float
-        Appearance of non-highlighted levels when *highlight_level* is set.
-    label_style : str
-        ``"numeric"`` (default) formats labels with *ic_label_fmt*;
-        ``"ordinal"`` labels levels ``u_1, u_2, ...`` in ascending order.
-    """
-
     def __init__(
         self,
         func,
@@ -83,177 +39,150 @@ class IndifferenceCurves:
         secondary_linewidth: float = 1.0,
         secondary_opacity: float = 0.45,
         label_style: str = "numeric",
-    ):
-        self.func = func
-        self.levels = levels
-        self.color = color
-        self.linewidth = linewidth
-        self.subsistence_color = subsistence_color
-        self.subsistence_linewidth = subsistence_linewidth
-        self.show_rays = show_rays
-        self.ray_color = ray_color
-        self.ray_linewidth = ray_linewidth
-        self.show_kinks = show_kinks
-        self.kink_color = kink_color
-        self.kink_radius = kink_radius
-        self.label = label
-        self.show_ic_labels = show_ic_labels
-        self.ic_label_fmt = ic_label_fmt
-        self.highlight_level = highlight_level
-        self.secondary_color = secondary_color
-        self.secondary_linewidth = secondary_linewidth
-        self.secondary_opacity = secondary_opacity
-        self.label_style = label_style
+    ) -> None:
+        self.func, self.levels, self.color, self.linewidth = func, levels, color, linewidth
+        self.label, self.show_ic_labels, self.ic_label_fmt = label, show_ic_labels, ic_label_fmt
+        self.highlight_level, self.label_style = highlight_level, label_style
+        self.show_rays, self.show_kinks = show_rays, show_kinks
+        self.ray_color, self.ray_linewidth = ray_color, ray_linewidth
+        self.kink_color, self.kink_radius = kink_color, kink_radius
+        self.subsistence_color, self.subsistence_linewidth = subsistence_color, subsistence_linewidth
+        self.secondary_color, self.secondary_linewidth, self.secondary_opacity = (
+            secondary_color,
+            secondary_linewidth,
+            secondary_opacity,
+        )
 
-    def _kinks(self, levels: list[float]) -> list[tuple[float, float]]:
-        """Exact model kink points used to snap reconstructed corners, if available."""
-        kink_points = getattr(self.func, "kink_points", None)
-        if kink_points is None:
-            return []
-        try:
-            return [(float(x), float(y)) for x, y in kink_points(levels)]
-        except Exception:  # noqa: BLE001 - an unusable kink hook must not break drawing
-            return []
+    def layers(self, x_max: float, y_max: float, **kwargs):
+        supported = {"res", "resolution", "tolerance"}
+        unknown = sorted(set(kwargs) - supported)
+        if unknown:
+            raise TypeError(f"renderer-specific indifference options are unsupported: {', '.join(unknown)}")
+        layers, computed = indifference_layers(
+            self.func,
+            self.levels,
+            x_max,
+            y_max,
+            res=int(kwargs.pop("res", 100)),
+            highlight_level=self.highlight_level,
+            show_labels=self.show_ic_labels,
+            label_fmt=self.ic_label_fmt,
+            label_style=self.label_style,
+            stroke=Stroke(color=self.color, width=self.linewidth),
+            secondary_stroke=Stroke(
+                color=self.secondary_color,
+                width=self.secondary_linewidth,
+                opacity=self.secondary_opacity,
+            ),
+            legend=self.label,
+            **kwargs,
+        )
+        return (*layers, *self._decoration_layers(computed, x_max, y_max)), computed
 
-    def draw(self, ax, x_max: float, y_max: float, **kwargs) -> list[float]:
-        """Draw curves onto *ax* and return the computed contour levels."""
-        from utility_viz.models.curves.layers import Layer
-
-        res = int(kwargs.pop("res", 400))
-        X, Y, Z = Layer.compute_contour(self.func, (CONTOUR_DOMAIN_MIN, x_max), (CONTOUR_DOMAIN_MIN, y_max), res=res)
-
-        computed = percentile_levels(Z, n=self.levels) if isinstance(self.levels, int) else list(self.levels)
-
-        logger.debug("Drawing contours at levels: %s", computed)
-
-        # Matplotlib dashes negative contour levels by default; utility levels are just levels.
-        kwargs.setdefault("linestyles", "solid")
-
-        focal_levels, segs_by_level, color_by_level = self._draw_contours(ax, X, Y, Z, computed, kwargs)
-        self._make_legend_proxy()
-
-        if self.show_ic_labels:
-            self._draw_ic_labels(ax, computed, segs_by_level, color_by_level, focal_levels, x_max, y_max)
-
-        self._draw_kinked_decorations(ax, computed, x_max, y_max)
-        self._draw_subsistence_lines(ax)
-
-        return computed
-
-    def _draw_contours(
-        self, ax, X, Y, Z, computed: list[float], kwargs: dict
-    ) -> tuple[list[float], dict[float, tuple], dict[float, str]]:
-        """Draw the focal (and, when highlighting, the muted secondary) contours."""
-        focal_idx: int | None = None
-        if self.highlight_level is not None and computed:
-            focal_idx = int(np.argmin(np.abs(np.array(computed) - self.highlight_level)))
-
-        focal_levels = computed if focal_idx is None else [computed[focal_idx]]
-        secondary_levels = [] if focal_idx is None else [lv for i, lv in enumerate(computed) if i != focal_idx]
-
-        cell = float(np.hypot(X[0, 1] - X[0, 0], Y[1, 0] - Y[0, 0]))
-        kinks = self._kinks(computed)
-
-        cs = ax.contour(X, Y, Z, levels=focal_levels, colors=self.color, linewidths=self.linewidth, **kwargs)
-        repair_contour_set(cs, cell, kinks)
-        tag(cs, "curve")
-
-        segs_by_level: dict[float, tuple] = dict(zip(focal_levels, cs.allsegs, strict=True))
-        color_by_level: dict[float, str] = dict.fromkeys(focal_levels, self.color)
-
-        if secondary_levels:
-            cs2 = ax.contour(
-                X,
-                Y,
-                Z,
-                levels=secondary_levels,
-                colors=self.secondary_color,
-                linewidths=self.secondary_linewidth,
-                alpha=self.secondary_opacity,
-                **kwargs,
-            )
-            repair_contour_set(cs2, cell, kinks)
-            tag(cs2, "secondary_curve")
-            segs_by_level.update(zip(secondary_levels, cs2.allsegs, strict=True))
-            color_by_level.update(dict.fromkeys(secondary_levels, self.secondary_color))
-        return focal_levels, segs_by_level, color_by_level
-
-    def _make_legend_proxy(self) -> None:
-        """Create the legend handle standing in for the contour set (if labelled)."""
-        import matplotlib.lines as mlines
-
-        self._proxy: mlines.Line2D | None = None
-        if self.label is not None:
-            self._proxy = mlines.Line2D([], [], color=self.color, linewidth=self.linewidth, label=self.label)
-            tag(self._proxy, "curve")
-
-    def _draw_subsistence_lines(self, ax) -> None:
+    def _decoration_layers(self, levels: list[float], x_max: float, y_max: float) -> tuple:
+        layers: list = []
+        if getattr(self.func, "utility_type", None) is UtilityType.KINKED:
+            if self.show_rays:
+                for index, slope in enumerate(self.func.ray_slopes(), 1):
+                    end = (x_max, min(y_max, slope * x_max)) if slope <= y_max / x_max else (y_max / slope, y_max)
+                    layers.append(
+                        PathLayer(
+                            ((0, 0), end),
+                            id=f"utility.ray.{index}",
+                            role="utility.equilibrium.ray",
+                            stroke=Stroke(
+                                color=self.ray_color,
+                                width=self.ray_linewidth,
+                                dash=DashStyle.DASHED,
+                            ),
+                        )
+                    )
+            if self.show_kinks:
+                points = tuple(self.func.kink_points(levels))
+                if points:
+                    layers.append(
+                        MarkerLayer(
+                            points,
+                            id="utility.kinks",
+                            role="utility.indifference.kink",
+                            marker=MosaicMarker(
+                                color=self.kink_color,
+                                size=(4 * self.kink_radius) ** 2,
+                            ),
+                        )
+                    )
         if hasattr(self.func, "subsistence_lines"):
             sub_x, sub_y = self.func.subsistence_lines()
-            style = dict(color=self.subsistence_color, linewidth=self.subsistence_linewidth, linestyle="--", alpha=0.6)
-            tag(ax.axvline(x=sub_x, **style), "subsistence")
-            tag(ax.axhline(y=sub_y, **style), "subsistence")
-
-    def _draw_ic_labels(self, ax, computed, segs_by_level, color_by_level, focal_levels, x_max, y_max) -> None:
-        for rank, level in enumerate(computed, start=1):
-            found = _rightmost_point(ax, segs_by_level[level], x_max, y_max)
-            if found is None:
-                continue
-            best_x, best_y, best_angle = found
-            text_str = f"$u_{{{rank}}}$" if self.label_style == "ordinal" else self.ic_label_fmt.format(level)
-            text = ax.annotate(
-                text_str,
-                (best_x, best_y),
-                textcoords="offset points",
-                xytext=(4, 0),
-                color=color_by_level[level],
-                fontsize=9,
-                ha="left",
-                va="center",
-                rotation=best_angle,
-                rotation_mode="anchor",
-                annotation_clip=True,
+            stroke = Stroke(
+                color=self.subsistence_color,
+                width=self.subsistence_linewidth,
+                dash=DashStyle.DASHED,
+                opacity=0.6,
             )
-            role = "ic_label" if level in focal_levels else "secondary_ic_label"
-            tag(text, role)
-            tag_attr(text, "_ev_label_default", Label(position=LabelPosition.RIGHT, offset=4))
-
-    def _draw_kinked_decorations(self, ax, computed, x_max: float, y_max: float) -> None:
-        from utility_viz.core.diagrams.components import draw_ray
-
-        if getattr(self.func, "utility_type", None) is not UtilityType.KINKED:
-            return
-        if self.show_rays:
-            for slope in self.func.ray_slopes():
-                draw_ray(ax, slope, x_max, y_max, color=self.ray_color, linewidth=self.ray_linewidth)
-        if self.show_kinks:
-            for x, y in self.func.kink_points(computed):
-                (kink,) = ax.plot(
-                    x,
-                    y,
-                    "o",
-                    markersize=self.kink_radius * 4,
-                    markerfacecolor=self.kink_color,
-                    markeredgecolor=self.kink_color,
+            layers.extend(
+                (
+                    PathLayer(
+                        ((sub_x, 0), (sub_x, y_max)),
+                        id="utility.subsistence.x",
+                        role="utility.indifference.subsistence",
+                        stroke=stroke,
+                    ),
+                    PathLayer(
+                        ((0, sub_y), (x_max, sub_y)),
+                        id="utility.subsistence.y",
+                        role="utility.indifference.subsistence",
+                        stroke=stroke,
+                    ),
                 )
-                tag(kink, "kink")
+            )
+        return tuple(layers)
 
+    def draw(self, canvas, x_max: float, y_max: float, **kwargs) -> list[float]:
+        supported = {"res", "resolution", "tolerance"}
+        unknown = sorted(set(kwargs) - supported)
+        if unknown:
+            raise TypeError(f"renderer-specific indifference options are unsupported: {', '.join(unknown)}")
+        before = {layer.id for layer in canvas.snapshot().layers}
+        canvas.add_utility(
+            self.func,
+            levels=self.levels,
+            color=self.color,
+            linewidth=self.linewidth,
+            show_rays=self.show_rays,
+            show_kinks=self.show_kinks,
+            kink_radius=self.kink_radius,
+            label=self.label,
+            show_ic_labels=self.show_ic_labels,
+            ic_label_fmt=self.ic_label_fmt,
+            ray_stroke=PublicStroke(color=self.ray_color, width=self.ray_linewidth, style="dashed"),
+            kink_marker=Marker(color=self.kink_color, size=4 * self.kink_radius),
+            highlight_level=self.highlight_level,
+            secondary_stroke=PublicStroke(
+                color=self.secondary_color,
+                width=self.secondary_linewidth,
+                opacity=self.secondary_opacity,
+            ),
+            label_style=self.label_style,
+            **kwargs,
+        )
+        self._restyle_subsistence(canvas, before)
+        return self._computed_levels(x_max, y_max, res=int(kwargs.get("res", 100)))
 
-def _rightmost_point(ax, segs, x_max: float, y_max: float):
-    """Return ``(x, y, angle)`` of the right-most visible point over *segs*, or None."""
-    best_x, best_y = -1.0, None
-    best_angle = 0.0
-    for seg in segs:
-        if len(seg) == 0:
-            continue
-        mask = (seg[:, 0] < x_max * 0.97) & (seg[:, 1] < y_max * 0.97)
-        seg = seg[mask]
-        if len(seg) == 0:
-            continue
-        idx = np.argmax(seg[:, 0])
-        if seg[idx, 0] > best_x:
-            best_x, best_y = seg[idx, 0], seg[idx, 1]
-            best_angle = _label_angle(ax, seg, int(idx))
-    if best_y is None:
-        return None
-    return best_x, best_y, best_angle
+    def _computed_levels(self, x_max: float, y_max: float, *, res: int) -> list[float]:
+        if not isinstance(self.levels, int):
+            return list(self.levels)
+        _, _, values = ContourGrid.compute_contour(
+            self.func,
+            (CONTOUR_DOMAIN_MIN, x_max),
+            (CONTOUR_DOMAIN_MIN, y_max),
+            res=res,
+        )
+        return percentile_levels(values, n=self.levels)
+
+    def _restyle_subsistence(self, canvas, before: set[str]) -> None:
+        stroke = Stroke(color=self.subsistence_color, width=self.subsistence_linewidth)
+        for layer in tuple(canvas.snapshot().layers):
+            if layer.id in before or not isinstance(layer, PathLayer) or "subsistence" not in layer.id:
+                continue
+            canvas.remove(layer.id)
+            canvas.add(replace(layer, stroke=stroke))

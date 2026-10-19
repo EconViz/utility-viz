@@ -34,6 +34,7 @@ def indifference_layers(
     label_fmt: str = "{:.2g}",
     label_style: str = "numeric",
     stroke: Stroke | None = None,
+    secondary_stroke: Stroke | None = None,
     legend: str | None = None,
     z_index: float = 0,
 ) -> tuple[tuple[Layer, ...], list[float]]:
@@ -79,7 +80,7 @@ def indifference_layers(
             layers.append(
                 PathLayer(
                     points,
-                    stroke=stroke if is_focal else None,
+                    stroke=stroke if is_focal else secondary_stroke,
                     id=f"{layer_id}.{rank}" if k == 0 else f"{layer_id}.{rank}.c{k + 1}",
                     role=main.value,
                     legend=legend if (legend and k == 0 and index == (focal or 0)) else None,
