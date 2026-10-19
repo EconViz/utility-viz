@@ -1282,7 +1282,7 @@ wheels = [
 
 [[package]]
 name = "mosaickit"
-version = "0.6.0"
+version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "glyphkit" },
@@ -1293,9 +1293,9 @@ dependencies = [
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/98/0d/1d1e274b4c5cce9fd2184292f38334689b7cb329430248280215cd9d100c/mosaickit-0.6.0.tar.gz", hash = "sha256:f1745d67e4ed32b152ffc947468dec2452ab85058384337ad3d2829530f41864", size = 251807, upload-time = "2026-10-19T14:20:06.154Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0e/ee/d037d582c37f2fc70a1d2c72377ad3dd42921ac3e640e7042d23524e179e/mosaickit-0.7.0.tar.gz", hash = "sha256:dffa58ec19d46b9838041a697205649ba81355816cbf19468abcc0b6c2737db6", size = 261113, upload-time = "2026-10-19T15:37:16.969Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3b/fa/7b54a1911bf1b4248e76339c67eb6d1abb1cc82f8cff347c15e7e33cb1ef/mosaickit-0.6.0-py3-none-any.whl", hash = "sha256:62fd56bfe115a00e54f0ea0966feb566f876201f38a88c1be3b3884d4c81c6d0", size = 98522, upload-time = "2026-10-19T14:20:04.657Z" },
+    { url = "https://files.pythonhosted.org/packages/65/f4/19f14475c8aa686522464b4a6996433d4d1f6c34797ad53eaa55027f9767/mosaickit-0.7.0-py3-none-any.whl", hash = "sha256:f12df327cb52ec0a06c2d823028d2b2e26f5f51f8f431ee07971aa344b02f4af", size = 106202, upload-time = "2026-10-19T15:37:15.106Z" },
 ]
 
 [[package]]
@@ -2380,7 +2380,7 @@ requires-dist = [
     { name = "ipywidgets", marker = "extra == 'interactive'", specifier = ">=8.0.0" },
     { name = "kinetickit", extras = ["raster"], marker = "extra == 'all'", specifier = ">=1.0.0b2,<2.0.0" },
     { name = "kinetickit", extras = ["raster"], marker = "extra == 'animation'", specifier = ">=1.0.0b2,<2.0.0" },
-    { name = "mosaickit", specifier = ">=0.6.0,<0.7.0" },
+    { name = "mosaickit", specifier = ">=0.6.0,<0.8.0" },
     { name = "numpy", specifier = ">=1.24.0" },
     { name = "scipy", specifier = ">=1.13.0,<2.0.0" },
     { name = "sympy", specifier = ">=1.12.0,<2.0.0" },
