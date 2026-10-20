@@ -1,7 +1,7 @@
 [project]
 name = "econ-viz"
 # Kept in lockstep with utility-viz (scripts/release.sh bumps both; CI checks them against the tag).
-version = "2.0.0b2"
+version = "2.0.0b3"
 description = "econ-viz was renamed to utility-viz. This package adds the deprecated econ_viz import name and econ-viz command."
 readme = "README.md"
 authors = [{ name = "Pin Yue Sung", email = "contact@econ-viz.org" }]
@@ -16,7 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Operating System :: OS Independent",
 ]
-dependencies = ["utility-viz==2.0.0b2"]
+dependencies = ["utility-viz==2.0.0b3"]
 
 [project.scripts]
 # Deprecated 1.x command: warns, then forwards to utility-viz. Removed in 3.0.

@@ -511,7 +511,7 @@ wheels = [
 
 [[package]]
 name = "econ-viz"
-version = "2.0.0b2"
+version = "2.0.0b3"
 source = { editable = "packages/econ-viz" }
 dependencies = [
     { name = "utility-viz" },

@@ -10,7 +10,7 @@ either emits a deprecation warning. Both are removed in 3.0.
 pip install utility-viz          # use this name from now on (no econ_viz, no econ-viz command)
 ```
 
-While 2.x is only available as a pre-release (currently 2.0.0b2), upgrading an existing installation
+While 2.x is only available as a pre-release (currently 2.0.0b3), upgrading an existing installation
 needs `--pre`: `pip install --pre --upgrade econ-viz`.
 
 See the migration guide: https://github.com/EconViz/utility-viz#migrating-from-econ-viz
