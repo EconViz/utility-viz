@@ -34,21 +34,6 @@ from utility_viz.core.styles.fill import Fill
 from utility_viz.core.styles.label import Label
 from utility_viz.core.styles.marker import Marker
 from utility_viz.core.styles.stroke import Stroke
-from utility_viz.enums import ArrowStyle, LineStyle
-
-_DASHES = {
-    LineStyle.SOLID: DashStyle.SOLID,
-    LineStyle.DASHED: DashStyle.DASHED,
-    LineStyle.DOTTED: DashStyle.DOTTED,
-    LineStyle.DASHDOT: DashStyle.DASHDOT,
-}
-
-_ARROWS = {
-    ArrowStyle.SIMPLE: MosaicArrowStyle.OPEN,
-    ArrowStyle.TRIANGLE: MosaicArrowStyle.TRIANGLE,
-    ArrowStyle.FANCY: MosaicArrowStyle.FANCY,
-    ArrowStyle.WEDGE: MosaicArrowStyle.WEDGE,
-}
 
 _NAMED_COLORS = {
     "black": "#000000",
@@ -89,8 +74,8 @@ def to_mosaic_stroke(value: Stroke | None) -> MosaicStroke | None:
     return MosaicStroke(
         color=_color(value.color),
         width=value.width,
-        dash=_DASHES[LineStyle(value.style)] if value.style is not None else None,
-        arrow=_ARROWS[ArrowStyle(value.arrow)] if value.arrow is not None else None,
+        dash=DashStyle(value.style) if value.style is not None else None,
+        arrow=MosaicArrowStyle(value.arrow) if value.arrow is not None else None,
         opacity=value.opacity,
     )
 

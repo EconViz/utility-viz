@@ -66,11 +66,19 @@ class TestAxisEnums:
             "bottom-left",
         }
 
-    def test_arrow_styles_are_matplotlib_compatible(self):
-        assert ArrowStyle.SIMPLE.value == "->"
-        assert ArrowStyle.TRIANGLE.value == "-|>"
+    def test_arrow_styles_accept_matplotlib_spellings(self):
+        assert ArrowStyle("->") is ArrowStyle.SIMPLE
+        assert ArrowStyle("-|>") is ArrowStyle.TRIANGLE
         assert ArrowStyle.FANCY.value == "fancy"
         assert ArrowStyle.WEDGE.value == "wedge"
+
+    def test_line_and_arrow_styles_are_mosaickits(self):
+        from mosaickit import ArrowStyle as MosaicArrowStyle
+        from mosaickit import DashStyle
+
+        assert LineStyle is DashStyle
+        assert ArrowStyle is MosaicArrowStyle
+        assert ArrowStyle.SIMPLE is ArrowStyle.OPEN
 
     def test_line_styles_are_matplotlib_names(self):
         assert [member.value for member in LineStyle] == ["solid", "dashed", "dotted", "dashdot"]
