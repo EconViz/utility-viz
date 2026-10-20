@@ -6,6 +6,10 @@
 
 ### Changes
 
+- Use MosaicKit's `DashStyle` and `ArrowStyle` instead of keeping copies:
+  `LineStyle` is now `DashStyle` under its old name, and `ArrowStyle` is
+  MosaicKit's (`ArrowStyle.SIMPLE` is `OPEN`; `"->"` and `"-|>"` are still
+  accepted). Require `mosaickit>=0.8.0,<0.9`.
 - Delegate GIF encoding to KineticKit and whole-scene or grid TikZ export to
   MosaicKit. UtilityViz now retains only its economic scene construction and a
   small BezierKit path-serialization adapter.

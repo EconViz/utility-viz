@@ -2,6 +2,13 @@
 
 from enum import Enum
 
+from mosaickit import ArrowStyle, DashStyle
+
+# The line and arrow styles are MosaicKit's: ``LineStyle`` is its ``DashStyle`` under the name
+# utility-viz has always used, and ``ArrowStyle.SIMPLE`` is MosaicKit's ``OPEN``.
+LineStyle = DashStyle
+__all__ = ["ArrowStyle", "LabelPosition", "LineStyle"]
+
 
 class LabelPosition(str, Enum):
     """Cardinal positions used to place labels around an axis arrowhead."""
@@ -14,26 +21,3 @@ class LabelPosition(str, Enum):
     TOP_LEFT = "top-left"
     BOTTOM_RIGHT = "bottom-right"
     BOTTOM_LEFT = "bottom-left"
-
-
-class ArrowStyle(str, Enum):
-    """Arrowhead styles for canvas axes."""
-
-    SIMPLE = "->"
-    TRIANGLE = "-|>"
-    FANCY = "fancy"
-    WEDGE = "wedge"
-
-
-class LineStyle(str, Enum):
-    """Line styles for the canvas axes."""
-
-    SOLID = "solid"
-    DASHED = "dashed"
-    DOTTED = "dotted"
-    DASHDOT = "dashdot"
-
-    @classmethod
-    def _missing_(cls, value):
-        """Also accept the conventional short forms: ``-``, ``--``, ``:``, ``-.``."""
-        return {"-": cls.SOLID, "--": cls.DASHED, ":": cls.DOTTED, "-.": cls.DASHDOT}.get(value)
