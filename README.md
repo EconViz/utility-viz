@@ -17,7 +17,7 @@ A Python toolkit for producing publication-quality microeconomics diagrams. Defi
 pip install utility-viz
 ```
 
-Requires Python 3.10 or later. The current release is a pre-release (2.0.0b3); while no stable 2.x
+Requires Python 3.10 or later. The current release is a pre-release (2.0.0b4); while no stable 2.x
 exists, `pip install utility-viz` picks it up. Once a stable release is published alongside it, use
 `pip install --pre utility-viz` to opt in to pre-releases.
 
@@ -67,7 +67,7 @@ The project ships with an interactive playground notebook:
 
 [`notebook/econ-viz Playground.ipynb`](notebook/econ-viz%20Playground.ipynb)
 
-The file keeps its historical name. Download it and open it in Jupyter, VS Code, or Colab. The first code cell installs `utility-viz[all]` (pinned to 2.0.0b3) from PyPI for fresh runtimes.
+The file keeps its historical name. Download it and open it in Jupyter, VS Code, or Colab. The first code cell installs `utility-viz[all]` (pinned to 2.0.0b4) from PyPI for fresh runtimes.
 
 ## Highlights
 
