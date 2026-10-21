@@ -102,19 +102,19 @@ def to_mosaic_marker(value: Marker | None) -> MosaicMarker | None:
     )
 
 
-def to_mosaic_text(value: Label | None, *, family: str | None = None) -> TextStyle | None:
+def to_mosaic_text(value: Label | None, *, font: str | None = None) -> TextStyle | None:
     """Convert the visual fields of a public label.
 
     Text content, anchor, offset, and visibility belong to the TextLayer and are
     intentionally handled by scene factories rather than this style converter.
     """
-    if value is None and family is None:
+    if value is None and font is None:
         return None
     label = value or Label()
     return TextStyle(
         color=_color(label.color),
         size=label.fontsize,
-        family=family,
+        font=font,
         opacity=label.opacity,
     )
 
@@ -148,8 +148,5 @@ def to_mosaic_theme(value: Any, *, font: str | None = None) -> MosaicTheme:
     theme = utility_theme(colors, name=value.name)
     if font is None:
         return theme
-    roles: dict[str, Any] = {}
-    for name, bundle in theme.roles.items():
-        text = bundle.text
-        roles[name] = bundle if text is None else bundle.merged_over(type(bundle)(text=TextStyle(family=font)))
-    return MosaicTheme(theme.name, roles)
+    chosen = type(theme.defaults)(text=TextStyle(font=font))
+    return MosaicTheme(theme.name, theme.roles, defaults=chosen.merged_over(theme.defaults))

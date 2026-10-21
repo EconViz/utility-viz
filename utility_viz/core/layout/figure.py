@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final, cast
 
 from mosaickit import Canvas as MosaicCanvas
-from mosaickit import CanvasGrid, TextLayer
+from mosaickit import CanvasGrid, MathFont, TextFonts, TextLayer
 from mosaickit import Layout as MosaicLayout
 
 from utility_viz.core.canvas.base import Canvas
@@ -75,8 +75,9 @@ class Figure:
         wspace: float = 0.25,
         x_arrow_style: ArrowStyle | str | None = None,
         y_arrow_style: ArrowStyle | str | None = None,
-        font: str | Sequence[str] | None = None,
-        math_font: str | None = None,
+        font: str | None = None,
+        fonts: TextFonts | None = None,
+        math_font: MathFont | str | os.PathLike[str] | None = None,
         x_line_style: LineStyle | str | None = None,
         y_line_style: LineStyle | str | None = None,
         axis_stroke: Stroke | None = None,
@@ -112,6 +113,7 @@ class Figure:
             x_arrow_style=x_arrow_style,
             y_arrow_style=y_arrow_style,
             font=font,
+            fonts=fonts,
             math_font=math_font,
             x_line_style=x_line_style,
             y_line_style=y_line_style,
@@ -146,7 +148,7 @@ class Figure:
                 self.title,
                 id="figure.title",
                 role="title",
-                style=to_mosaic_text(self.title_style, family=canvas.font),
+                style=to_mosaic_text(self.title_style, font=canvas.font),
                 offset=(0, 24),
                 anchor="bottom",
                 z_index=20,

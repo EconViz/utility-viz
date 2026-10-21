@@ -68,6 +68,7 @@ class DemandDiagram(Figure):
             x_axis=Axis(stroke=x_axis.stroke if x_axis else None),
             y_axis=Axis(stroke=y_axis.stroke if y_axis else None),
             font=self.utility_canvas.font,
+            fonts=self.utility_canvas.fonts,
             math_font=self.utility_canvas.math_font,
         )
         self.canvases[1] = self.demand_canvas
@@ -192,7 +193,7 @@ def _add_demand_label(canvas: Canvas, point, fallback_text: str, label: Label | 
             text,
             id=f"demand.point.{fallback_text}.label",
             role="utility.demand.point",
-            style=to_mosaic_text(style, family=canvas.math_family or canvas.font),
+            style=to_mosaic_text(style, font=canvas.font),
             offset=offset,
             anchor=anchor,
             math=True,

@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## Unreleased
+
+### Breaking changes
+
+- Fonts behave as in every diagram package built on MosaicKit. `font` is `"sans"` (the default),
+  `"serif"` or `"mono"`, not the name of an installed font family: any other value raises
+  `InvalidParameterError`. Pass `fonts=TextFonts(...)` to replace any of the three with your font
+  files; the rest keep the defaults.
+- `math_font` takes a `mosaickit.MathFont` or the path of an OpenType math font file, and math is set
+  through GlyphKit; without it math is set by Matplotlib. The names `dejavusans`, `dejavuserif`, `cm`,
+  `stix` and `stixsans` are no longer accepted.
+- `utility-viz.toml`: `[font] text` is a generic font, `[font] math` is a math font file, and a new
+  `[fonts]` table lists the font files (`sans`, `serif`, `mono`); relative paths follow the config
+  file. `Config.fonts` and `Canvas(fonts=...)`, `Figure(fonts=...)` are new.
+- Requires `mosaickit>=0.9.1,<0.10.0` (TikZ export of the generic font needs 0.9.2).
+
 ## v2.0.0b3 (2026-10-20)
 
 ### Changes

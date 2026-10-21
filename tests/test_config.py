@@ -1,7 +1,10 @@
 """Tests for Config: TOML settings mapped onto Theme properties (#112)."""
 
+from pathlib import Path
+
+import matplotlib
 import pytest
-from mosaickit import FillLayer, MarkerLayer, PathLayer
+from mosaickit import FillLayer, MarkerLayer, MathFont, PathLayer, TextFonts
 
 from utility_viz import Canvas, Config, Figure, Layout, themes
 from utility_viz.core.config.settings import template
@@ -10,11 +13,18 @@ from utility_viz.core.errors.exceptions import InvalidParameterError
 from utility_viz.enums import LabelPosition, LegendPosition, LineStyle
 from utility_viz.models.utility import CobbDouglas
 
-EXAMPLE = """
+FONT_DIR = Path(matplotlib.get_data_path()) / "fonts" / "ttf"
+MATH_FILE = FONT_DIR / "DejaVuSerif.ttf"  # has an OpenType MATH table
+
+EXAMPLE = f"""
 base = "default"
 
 [font]
-math = "stix"
+text = "serif"
+math = "{MATH_FILE}"
+
+[fonts]
+mono = ["{FONT_DIR / "DejaVuSansMono.ttf"}", "{FONT_DIR / "DejaVuSansMono-Bold.ttf"}"]
 
 [color]
 ic = "#2E86AB"
@@ -73,7 +83,9 @@ class TestLoad:
         assert t.origin_label.visible is False
         assert (t.budget_fill.color, t.budget_fill.opacity) == ("lightgrey", 0.3)
         assert t.legend.position is LegendPosition.BOTTOM
-        assert config.math_font == "stix" and config.font is None
+        assert config.font == "serif"
+        assert config.math_font == MathFont(MATH_FILE)
+        assert config.fonts == TextFonts(mono=(FONT_DIR / "DejaVuSansMono.ttf", FONT_DIR / "DejaVuSansMono-Bold.ttf"))
 
     def test_untouched_settings_stay_default(self, example):
         t = Config.load(example).theme
@@ -99,6 +111,13 @@ class TestLoad:
             ({"stroke": {"budget": {"width": -1}}}, "must be positive"),
             ({"label": {"point": {"position": "middle"}}}, "invalid"),
             ({"font": {"size": 12}}, "text and math"),
+            ({"font": {"text": "Avenir"}}, "font must be one of sans, serif, mono"),
+            ({"font": {"math": "stix"}}, "pass the path of an OpenType math font"),
+            ({"font": {"math": "missing.otf"}}, "not a font file"),
+            ({"fonts": {"title": ["a.ttf"]}}, "sans, serif and mono"),
+            ({"fonts": {"sans": []}}, "non-empty list"),
+            ({"fonts": {"serif": ["/no/such.ttf"]}}, "not a font file"),
+            ({"fonts": 3}, "must be a table"),
             ({"legend": 3}, "must be a table"),
         ],
     )
@@ -121,7 +140,8 @@ class TestUse:
         cvs = Canvas().add_budget(2, 3, 30)
         budget = next(a for a in cvs.snapshot().ordered_layers if isinstance(a, PathLayer) and a.id == "budget")
         assert budget.stroke.width == 3.0
-        assert cvs.math_font == "stix"
+        assert cvs.math_font == MathFont(MATH_FILE) and cvs.font == "serif"
+        assert cvs.fonts == Config.active().fonts
         assert not any(a.id == "axes.origin.label" for a in cvs.snapshot().ordered_layers)
 
     def test_config_markers_and_strokes_are_drawn(self, example):
@@ -234,3 +254,19 @@ class TestCli:
                 str(tmp_path / "x.png"),
             )
         assert "no such setting" in capsys.readouterr().err
+
+
+class TestFontPaths:
+    def test_relative_font_paths_follow_the_config_file(self, tmp_path):
+        (tmp_path / "fonts").mkdir()
+        (tmp_path / "fonts" / "serif.ttf").write_bytes((FONT_DIR / "DejaVuSerif.ttf").read_bytes())
+        (tmp_path / "fonts" / "math.ttf").write_bytes(MATH_FILE.read_bytes())
+        path = tmp_path / "utility-viz.toml"
+        path.write_text('[font]\nmath = "fonts/math.ttf"\n[fonts]\nserif = "fonts/serif.ttf"\n', encoding="utf-8")
+        config = Config.load(path)
+        assert config.fonts == TextFonts(serif=tmp_path / "fonts" / "serif.ttf")
+        assert config.math_font == MathFont(tmp_path / "fonts" / "math.ttf")
+
+    def test_the_template_documents_the_generic_fonts(self):
+        text = template()
+        assert 'text = "serif"' in text and "[fonts]" in text and "math = " in text

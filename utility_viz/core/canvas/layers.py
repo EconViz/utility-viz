@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
-from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
-from mosaickit import LegendLayer, LegendStyle, MarkerLayer, PathLayer, TextLayer, TextStyle
+from mosaickit import LegendLayer, LegendStyle, MarkerLayer, PathLayer, TextLayer
 
 from utility_viz.core.scenes import budget_layers, decomposition_layers, equilibrium_layers, indifference_layers
 from utility_viz.core.scenes.path import smooth_path
@@ -41,7 +40,6 @@ _LEGEND_LOCATIONS = {
 class LayerMixin:
     legacy_theme: Any
     font: str | None
-    math_family: str | None
     x_max: float
     y_max: float
     add: Any
@@ -150,7 +148,7 @@ class LayerMixin:
             offset, anchor = _label_placement(style)
             return (
                 text,
-                to_mosaic_text(style, family=self.math_family or self.font),
+                to_mosaic_text(style, font=self.font),
                 offset,
                 anchor,
                 style.visible is not False,
@@ -162,7 +160,7 @@ class LayerMixin:
                 y_max=self.y_max,
                 budget_strokes=budgets,
                 bundle_marker=to_mosaic_marker(marker),
-                bundle_text=to_mosaic_text(bundle_label, family=self.math_family or self.font),
+                bundle_text=to_mosaic_text(bundle_label, font=self.font),
                 bundle_text_offset=bundle_offset,
                 bundle_text_anchor=bundle_anchor,
                 bundle_text_visible=bundle_label.visible is not False,
@@ -209,7 +207,7 @@ class LayerMixin:
                             layer.text,
                             id=layer.id,
                             role=layer.role,
-                            style=to_mosaic_text(label_style, family=self.math_family or self.font),
+                            style=to_mosaic_text(label_style, font=self.font),
                             offset=layer.offset,
                             anchor=layer.anchor,
                             math=True,
@@ -219,7 +217,7 @@ class LayerMixin:
                         else layer
                         for layer in layers
                     )
-                self.extend(_with_math_family(layer, self.math_family) for layer in layers)
+                self.extend(layers)
         if label_effects:
             self.show_legend(legend)
         return self
@@ -277,8 +275,7 @@ class LayerMixin:
         )
         if ic_label is not None:
             _, ic_style = split_label(ic_label, theme.ic_label)
-            layers = tuple(_restyle_text(layer, ic_style, self.math_family or self.font) for layer in layers)
-        layers = tuple(_with_math_family(layer, self.math_family) for layer in layers)
+            layers = tuple(_restyle_text(layer, ic_style, self.font) for layer in layers)
         self.extend(layers)
         _add_kink_features(self, func, computed, layer_id, show_rays, show_kinks, kink_radius, ray_stroke, kink_marker)
         _add_subsistence_lines(self, func, layer_id)
@@ -318,7 +315,7 @@ class LayerMixin:
             fill_style=to_mosaic_fill(shade),
             legend=label,
         )
-        self.extend(_with_math_family(layer, self.math_family) for layer in layers)
+        self.extend(layers)
         return self
 
     def add_equilibrium(
@@ -354,8 +351,8 @@ class LayerMixin:
                 if isinstance(layer, TextLayer):
                     if label_style.color is None and selected_marker.color is not None:
                         label_style = Label(color=selected_marker.color).merged_over(label_style)
-                    layers[index] = _restyle_text(layer, label_style, self.math_family or self.font)
-        self.extend(_with_math_family(layer, self.math_family) for layer in layers)
+                    layers[index] = _restyle_text(layer, label_style, self.font)
+        self.extend(layers)
         return self
 
     def add_ray(
@@ -417,7 +414,7 @@ class LayerMixin:
                     text,
                     id=f"{prefix}.label",
                     role="utility.equilibrium",
-                    style=to_mosaic_text(style, family=self.math_family or self.font),
+                    style=to_mosaic_text(style, font=self.font),
                     offset=label_offset,
                     anchor=anchor,
                     math=True,
@@ -619,7 +616,7 @@ def _add_bliss_point(
         TextLayer(
             (func.bliss_x, func.bliss_y),
             text,
-            style=to_mosaic_text(style, family=canvas.math_family or canvas.font),
+            style=to_mosaic_text(style, font=canvas.font),
             offset=offset,
             anchor=anchor,
             math=True,
@@ -663,17 +660,10 @@ def _restyle_text(layer, style: Label, font: str | None):
         layer.text,
         id=layer.id,
         role=layer.role,
-        style=to_mosaic_text(style, family=font),
+        style=to_mosaic_text(style, font=font),
         offset=offset,
         anchor=anchor,
         math=layer.math,
         visible=style.visible is not False,
         z_index=layer.z_index,
     )
-
-
-def _with_math_family(layer, family: str | None):
-    if not isinstance(layer, TextLayer) or not layer.math or family is None:
-        return layer
-    style = TextStyle(family=family)
-    return replace(layer, style=style.merged_over(layer.style) if layer.style is not None else style)

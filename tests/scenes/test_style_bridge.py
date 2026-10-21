@@ -65,12 +65,12 @@ def test_marker_conversion_translates_diameter_to_area():
 
 
 def test_label_conversion_preserves_text_style_fields():
-    converted = to_mosaic_text(Label(color="#334455", fontsize=13, opacity=0.6), family="Avenir")
+    converted = to_mosaic_text(Label(color="#334455", fontsize=13, opacity=0.6), font="serif")
 
     assert isinstance(converted, TextStyle)
     assert converted.color.to_hex().upper() == "#334455"
     assert converted.size == 13
-    assert converted.family == "Avenir"
+    assert converted.font == "serif"
     assert converted.opacity == 0.6
 
 

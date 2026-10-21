@@ -9,7 +9,8 @@ the matching style object::
     [fill.budget]     -> theme.budget_fill     (Fill)
     [legend]          -> theme.legend          (Legend)
     [color]           -> Theme colour fields, e.g. ic = "#2E86AB" -> ic_color
-    [font]            -> text / math font for Canvas and Figure
+    [font]            -> text = generic font (sans, serif, mono), math = a math font file
+    [fonts]           -> font files that replace the generic fonts (sans, serif, mono)
 
 Anything left out keeps the built-in default.
 """
@@ -21,8 +22,12 @@ import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+
+from mosaickit import ConfigurationError, MathFont, TextFonts
 
 import utility_viz.core.themes as themes
+from utility_viz.core.config.fonts import _OLD_MATH_TOKENS, resolve_font, resolve_math_font
 from utility_viz.core.errors.deprecation import warn_deprecated
 from utility_viz.core.errors.exceptions import InvalidParameterError
 from utility_viz.core.styles.fill import Fill
@@ -49,7 +54,7 @@ _STYLES = {
 }
 # Friendlier names for a few properties.
 _ALIASES = {"equilibrium": "eq", "substitution_effect": "sub_effect", "income_effect": "inc_effect"}
-_TOP_LEVEL = {"base", "font", "color"} | set(_STYLES) | {"legend"}
+_TOP_LEVEL = {"base", "font", "fonts", "color"} | set(_STYLES) | {"legend"}
 _OVERRIDES = "_ev_overrides"
 
 
@@ -62,14 +67,17 @@ class Config:
     theme : Theme
         Theme with the configured overrides applied.
     font : str, optional
-        Text font family for every Canvas and Figure.
-    math_font : str, optional
-        Math font set (see :class:`Canvas`).
+        Generic font for every Canvas and Figure: ``"sans"`` (default), ``"serif"`` or ``"mono"``.
+    fonts : mosaickit.TextFonts, optional
+        Font files that replace the generic fonts; the ones left out keep the defaults.
+    math_font : mosaickit.MathFont, optional
+        Math font file; without it math is set by Matplotlib.
     """
 
     theme: Theme = themes.default
     font: str | None = None
-    math_font: str | None = None
+    fonts: TextFonts | None = None
+    math_font: MathFont | None = None
 
     @classmethod
     def load(cls, path: str | Path | None = None) -> Config:
@@ -108,11 +116,15 @@ class Config:
             raise InvalidParameterError(f"config file not found: {path}") from None
         except tomllib.TOMLDecodeError as error:
             raise InvalidParameterError(f"{path}: invalid TOML: {error}") from None
-        return cls.from_dict(data, source=str(path))
+        return cls.from_dict(data, source=str(path), base_dir=path.parent)
 
     @classmethod
-    def from_dict(cls, data: Mapping, *, source: str = "config") -> Config:
-        """Build a Config from already-parsed TOML data."""
+    def from_dict(cls, data: Mapping, *, source: str = "config", base_dir: Path | None = None) -> Config:
+        """Build a Config from already-parsed TOML data.
+
+        Relative font paths are resolved against *base_dir* (the TOML file's directory when read
+        from a file).
+        """
         unknown = set(data) - _TOP_LEVEL
         if unknown:
             raise InvalidParameterError(
@@ -150,7 +162,13 @@ class Config:
         extra = set(font) - {"text", "math"}
         if extra:
             raise InvalidParameterError(f"{source}: [font] takes text and math, not {', '.join(sorted(extra))}")
-        return cls(theme=_themed(base, fields, properties), font=font.get("text"), math_font=font.get("math"))
+        try:
+            text = resolve_font(font.get("text"))
+            math_font = resolve_math_font(_resolve(font.get("math"), base_dir))
+            fonts = _text_fonts(_table(data, "fonts", source), base_dir, source)
+        except InvalidParameterError as error:
+            raise InvalidParameterError(f"{source}: {error}") from None
+        return cls(theme=_themed(base, fields, properties), font=text, fonts=fonts, math_font=math_font)
 
     def use(self) -> Config:
         """Make this the default for diagrams created from now on; returns *self*."""
@@ -232,6 +250,33 @@ def _table(data: Mapping, key: str, source: str) -> Mapping:
     return value
 
 
+def _resolve(value: Any, base_dir: Path | None) -> Any:
+    """A font path relative to the config file's directory; anything else is returned as it is."""
+    if isinstance(value, str) and value and value not in _OLD_MATH_TOKENS:
+        path = Path(value).expanduser()
+        return path if path.is_absolute() or base_dir is None else base_dir / path
+    return value
+
+
+def _text_fonts(table: Mapping, base_dir: Path | None, source: str) -> TextFonts | None:
+    """``[fonts]``: ``sans``, ``serif`` and ``mono``, each a font file or a list of them."""
+    extra = set(table) - {"sans", "serif", "mono"}
+    if extra:
+        raise InvalidParameterError(f"[fonts] takes sans, serif and mono, not {', '.join(sorted(extra))}")
+    slots: dict[str, list[Path]] = {}
+    for slot, files in table.items():
+        files = [files] if isinstance(files, str) else files
+        if not isinstance(files, list) or not files or not all(isinstance(f, str) and f for f in files):
+            raise InvalidParameterError(f"[fonts] {slot} must be a font file or a non-empty list of them")
+        slots[slot] = [_resolve(f, base_dir) for f in files]
+    if not slots:
+        return None
+    try:
+        return TextFonts(**{slot: tuple(files) for slot, files in slots.items()})
+    except ConfigurationError as error:
+        raise InvalidParameterError(f"[fonts] {error}") from None
+
+
 def _require_field(theme: Theme, name: str, where: str) -> None:
     if name not in {field.name for field in dataclasses.fields(theme)}:
         colours = sorted(f.name[: -len("_color")] for f in dataclasses.fields(theme) if f.name.endswith("_color"))
@@ -308,8 +353,15 @@ def template() -> str:
 base = "default"                 # built-in theme to start from: {base_choices}
 
 [font]
-# text = "TeX Gyre Pagella"      # any installed font family
-# math = "stix"                  # dejavusans, dejavuserif, cm, stix, stixsans
+# text = "serif"                 # sans (default), serif or mono
+# math = "fonts/STIXTwoMath.otf"  # an OpenType math font; without it math is set by Matplotlib
+
+[fonts]
+# Font files that replace a generic font; the ones left out keep the defaults.
+# A list takes a regular and a bold file, or one variable font.
+# sans = ["fonts/SourceSans3-Regular.ttf", "fonts/SourceSans3-Bold.ttf"]
+# serif = ["fonts/SourceSerif4-Regular.ttf"]
+# mono = ["fonts/JetBrainsMono-Regular.ttf"]
 
 [color]
 # One of: {", ".join(colours)}
