@@ -2,19 +2,20 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import os
 from pathlib import Path
 from typing import Any
 
-from mosaickit import ArrowPlacement, CanvasSpec, PathLayer, TextLayer
+from mosaickit import ArrowPlacement, CanvasSpec, MathFont, PathLayer, TextFonts, TextLayer
 from mosaickit import Canvas as MosaicCanvas
+from mosaickit import Config as MosaicConfig
 
 from utility_viz.core.canvas._labels import _axis_stroke, _label_position
 from utility_viz.core.canvas.layers import LayerMixin
+from utility_viz.core.config.fonts import resolve_font, resolve_fonts, resolve_math_font
 from utility_viz.core.config.settings import Config
 from utility_viz.core.constants.canvas import DEFAULT_DPI, MAX_DPI, MIN_DPI
 from utility_viz.core.errors.exceptions import InvalidParameterError
-from utility_viz.core.scenes.fonts import resolve_font, resolve_math_font
 from utility_viz.core.scenes.styles import to_mosaic_stroke, to_mosaic_text, to_mosaic_theme
 from utility_viz.core.styles.axis import Axis
 from utility_viz.core.styles.label import Label, split_label
@@ -48,8 +49,9 @@ class Canvas(LayerMixin, MosaicCanvas):
         ax: Any = None,
         x_arrow_style: ArrowStyle | str | None = None,
         y_arrow_style: ArrowStyle | str | None = None,
-        font: str | Sequence[str] | None = None,
-        math_font: str | None = None,
+        font: str | None = None,
+        fonts: TextFonts | None = None,
+        math_font: MathFont | str | os.PathLike[str] | None = None,
         x_line_style: LineStyle | str | None = None,
         y_line_style: LineStyle | str | None = None,
         axis_stroke: Stroke | None = None,
@@ -69,9 +71,9 @@ class Canvas(LayerMixin, MosaicCanvas):
 
         active = Config.active()
         legacy_theme = theme if theme is not None else active.theme
-        selected_font = font if font is not None else active.font
-        self.font_families, selected_font = resolve_font(selected_font)
-        self.math_font, self.math_family = resolve_math_font(math_font if math_font is not None else active.math_font)
+        selected_font = resolve_font(font if font is not None else active.font)
+        self.fonts = resolve_fonts(fonts if fonts is not None else active.fonts)
+        self.math_font = resolve_math_font(math_font if math_font is not None else active.math_font)
         self.legacy_theme = legacy_theme
         self.font = selected_font
 
@@ -114,7 +116,11 @@ class Canvas(LayerMixin, MosaicCanvas):
             y_label="",
             title=None,
         )
-        super().__init__(spec=spec, theme=to_mosaic_theme(legacy_theme, font=selected_font))
+        super().__init__(
+            spec=spec,
+            theme=to_mosaic_theme(legacy_theme, font=selected_font),
+            config=MosaicConfig(fonts=self.fonts, math_font=self.math_font),
+        )
         self.extend(self._axis_layers())
 
     def _next_id(self, prefix: str) -> str:
@@ -160,7 +166,7 @@ class Canvas(LayerMixin, MosaicCanvas):
                     self.x_label,
                     id="axes.x.label",
                     role="axes",
-                    style=to_mosaic_text(self.x_label_style, family=self.math_family or self.font),
+                    style=to_mosaic_text(self.x_label_style, font=self.font),
                     offset=x_offset,
                     anchor=x_anchor,
                     math=True,
@@ -173,7 +179,7 @@ class Canvas(LayerMixin, MosaicCanvas):
                     self.y_label,
                     id="axes.y.label",
                     role="axes",
-                    style=to_mosaic_text(self.y_label_style, family=self.math_family or self.font),
+                    style=to_mosaic_text(self.y_label_style, font=self.font),
                     offset=y_offset,
                     anchor=y_anchor,
                     math=True,
@@ -186,7 +192,7 @@ class Canvas(LayerMixin, MosaicCanvas):
                     self.origin_text,
                     id="axes.origin.label",
                     role="axes",
-                    style=to_mosaic_text(self.origin_style, family=self.font),
+                    style=to_mosaic_text(self.origin_style, font=self.font),
                     offset=(-4, -4),
                     anchor="top-right",
                 )
@@ -198,7 +204,7 @@ class Canvas(LayerMixin, MosaicCanvas):
                     self.title,
                     id="canvas.title",
                     role="title",
-                    style=to_mosaic_text(self.title_style, family=self.font),
+                    style=to_mosaic_text(self.title_style, font=self.font),
                     offset=(0, 12),
                     anchor="bottom",
                     z_index=10,

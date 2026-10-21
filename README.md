@@ -199,23 +199,34 @@ canvas.add_decomposition(dec, legend=Legend(position="bottom"))
 canvas.show_legend(legend=Legend(position="upper left", fontsize=10))
 ```
 
-Set a font for one canvas or a whole multi-panel figure without touching
-renderer-global settings. Pass a family name, a generic family such as
-`"serif"`, or a fallback list:
+Set the fonts of one canvas or a whole multi-panel figure without touching
+renderer-global settings. `font` is `"sans"` (the default), `"serif"` or `"mono"`;
+`fonts` replaces any of the three with your font files (the rest keep the
+defaults); `math_font` is the path of an OpenType math font, and without it math
+is set by Matplotlib:
 
 ```python
-from utility_viz import Figure, Layout
+from mosaickit import TextFonts
 
-canvas = Canvas(font=["Times New Roman", "serif"], math_font="stix")
-figure = Figure(Layout.SIDE_BY_SIDE, font="serif", math_font="stix")
+from utility_viz import Canvas, Figure, Layout
+
+canvas = Canvas(font="serif")
+figure = Figure(
+    Layout.SIDE_BY_SIDE,
+    font="serif",
+    fonts=TextFonts(serif="fonts/SourceSerif4-Regular.ttf"),
+    math_font="fonts/STIXTwoMath.otf",
+)
 ```
 
 `font` applies to titles, axis labels, annotations, curve labels, and legends.
-Math text, including the default axis labels, uses `math_font`: `"stix"`
-(Times-like), `"cm"` (Computer Modern), `"dejavuserif"`, `"dejavusans"`, or
-`"stixsans"`. An unavailable font raises
-`InvalidParameterError`. TikZ output uses the LaTeX document's fonts, so only
-generic families are mapped (`serif` → `\rmfamily`, `monospace` → `\ttfamily`).
+A character the font lacks, such as a Chinese character in the default fonts,
+raises an error naming the text: give the slot a font file that has it. The same
+three settings work in `utility-viz.toml` (`[font] text`, `[font] math` and
+`[fonts]`) and in principle-viz. Installed font family names and the old math
+font names (`"stix"`, `"cm"`, ...) are no longer accepted. TikZ output uses the
+LaTeX document's fonts, so the three generic fonts are mapped (`sans` →
+`\sffamily`, `serif` → `\rmfamily`, `mono` → `\ttfamily`).
 
 Closed-form Marshallian demand in TeX:
 
