@@ -16,7 +16,7 @@
 - `utility-viz.toml`: `[font] text` is a generic font, `[font] math` is a math font file, and a new
   `[fonts]` table lists the font files (`sans`, `serif`, `mono`); relative paths follow the config
   file. `Config.fonts` and `Canvas(fonts=...)`, `Figure(fonts=...)` are new.
-- Requires `mosaickit>=0.9.1,<0.10.0` (TikZ export of the generic font needs 0.9.2).
+- Requires `mosaickit>=0.9.2,<0.10.0` .
 
 ## v2.0.0b3 (2026-10-20)
 
