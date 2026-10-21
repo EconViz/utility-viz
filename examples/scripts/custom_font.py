@@ -1,4 +1,4 @@
-"""Draw the same consumer equilibrium with the default and a serif font."""
+"""Draw the same consumer equilibrium in the serif font."""
 
 from pathlib import Path
 
@@ -13,14 +13,14 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 model = CobbDouglas(alpha=0.5, beta=0.5)
 eq = solve(model, px=2.0, py=3.0, income=30.0)
 
-# Fallback list: the first installed family is used.
+# font is sans (the default), serif or mono. To use your own files, pass fonts=TextFonts(...) and,
+# for math, math_font=<path of an OpenType math font>.
 fig = Figure(
     Layout.SIDE_BY_SIDE,
     x_max=20,
     y_max=15,
     title="Consumer equilibrium",
-    font=["Times New Roman", "DejaVu Serif", "serif"],
-    math_font="stix",
+    font="serif",
 )
 for panel, title in zip(fig.canvases, ["Utility map", "With budget"], strict=True):
     panel.add(

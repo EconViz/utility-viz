@@ -48,7 +48,7 @@ def test_font_files_replace_a_generic_font_through_the_mosaickit_config():
     assert canvas.fonts is fonts
     assert canvas.config.fonts is fonts
     with pytest.raises(InvalidParameterError, match="TextFonts"):
-        Canvas(fonts=str(SERIF))  # type: ignore[arg-type]
+        Canvas(fonts=str(SERIF))
 
 
 def test_a_math_font_is_a_mathfont_or_the_path_of_one():
@@ -61,7 +61,7 @@ def test_a_math_font_is_a_mathfont_or_the_path_of_one():
     with pytest.raises(InvalidParameterError, match="pass the path of an OpenType math font"):
         Canvas(math_font="stix")  # the old tokens are gone: pass a file
     with pytest.raises(InvalidParameterError, match="MathFont"):
-        Canvas(math_font=3)  # type: ignore[arg-type]
+        Canvas(math_font=3)
 
 
 def test_figure_propagates_font_fonts_and_math_font():
