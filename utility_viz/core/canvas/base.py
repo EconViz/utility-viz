@@ -10,7 +10,7 @@ from mosaickit import ArrowPlacement, CanvasSpec, MathFont, PathLayer, TextFonts
 from mosaickit import Canvas as MosaicCanvas
 from mosaickit import Config as MosaicConfig
 
-from utility_viz.core.canvas._labels import _axis_stroke, _label_position
+from utility_viz.core.canvas._labels import _axis_label_is_math, _axis_stroke, _label_position
 from utility_viz.core.canvas.layers import LayerMixin
 from utility_viz.core.config.fonts import resolve_font, resolve_fonts, resolve_math_font
 from utility_viz.core.config.settings import Config
@@ -169,7 +169,7 @@ class Canvas(LayerMixin, MosaicCanvas):
                     style=to_mosaic_text(self.x_label_style, font=self.font),
                     offset=x_offset,
                     anchor=x_anchor,
-                    math=True,
+                    math=_axis_label_is_math(self.x_label),
                 )
             )
         if self.y_label_style.visible is not False:
@@ -182,7 +182,7 @@ class Canvas(LayerMixin, MosaicCanvas):
                     style=to_mosaic_text(self.y_label_style, font=self.font),
                     offset=y_offset,
                     anchor=y_anchor,
-                    math=True,
+                    math=_axis_label_is_math(self.y_label),
                 )
             )
         if self.origin_style.visible is not False:
