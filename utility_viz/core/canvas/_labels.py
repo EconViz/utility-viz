@@ -67,6 +67,17 @@ def _arrow_style(value: ArrowStyle | str) -> ArrowStyle:
         raise ValueError(f"invalid arrow style {value!r}; choose: {choices}") from None
 
 
+def _axis_label_is_math(text: str) -> bool:
+    """Whether an axis label is set as one math expression.
+
+    A plain ASCII label such as ``"x"`` keeps its math italic. A label that already
+    contains ``$`` is mixed text and math, and a label with other scripts (Chinese,
+    for example) is text; wrapping either in ``$...$`` would break the parse or draw
+    the text with the math font.
+    """
+    return "$" not in text and text.isascii()
+
+
 def _label_math(text: str) -> str:
     if text.startswith("$") and text.endswith("$") and len(text) >= 2:
         return text

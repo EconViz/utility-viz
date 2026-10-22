@@ -81,3 +81,20 @@ def test_axis_label_reaches_tikz(tmp_path):
     output = tmp_path / "text.tex"
     Canvas(x_axis=Axis(label=Label(text="q_1", fontsize=18))).save(output)
     assert "q_1" in output.read_text(encoding="utf-8")
+
+
+def test_axis_labels_are_math_only_when_plain_ascii():
+    canvas = Canvas(
+        x_axis=Axis(label="x_1"),
+        y_axis=Axis(label="price $p$"),
+    )
+    assert _text(canvas, "axes.x.label").math is True
+    assert _text(canvas, "axes.y.label").math is False
+    assert _text(Canvas(x_axis=Axis(label="數量")), "axes.x.label").math is False
+    assert _text(Canvas(x_axis=Axis(label="$x$")), "axes.x.label").math is False
+
+
+def test_mixed_text_and_math_axis_label_renders(tmp_path):
+    canvas = Canvas(x_axis=Axis(label="quantity $x_1$"), y_axis=Axis(label="price $p$"))
+    canvas.save(tmp_path / "mixed.svg")
+    assert (tmp_path / "mixed.svg").read_bytes().startswith(b"<?xml")
