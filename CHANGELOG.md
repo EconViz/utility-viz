@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v2.0.0b5 (2026-10-22)
+
+### Changes
+
+- Faster figures with identical output. The contour grid is evaluated in one vectorized call when the
+  utility takes arrays (a utility that rejects arrays, or whose array value disagrees with its scalar
+  value at three probe points, keeps the per-point path), and the stack underneath is faster:
+  `bezierkit>=1.1.0` and `mosaickit>=1.0.0rc2,<2.0.0` (the upper bound was `<0.10.0`). On the six
+  indifference-map benchmark figures the median time per figure falls from 244-408 ms to 25-41 ms
+  (10x, geometric mean), and the 14 benchmark SVG files are byte-identical to the previous stack.
+
 ## v2.0.0b4 (2026-10-21)
 
 ### Breaking changes
