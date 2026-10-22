@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from typing import Any
 
 import numpy as np
 import pytest
@@ -13,7 +14,7 @@ from utility_viz.models.curves import level_paths
 from utility_viz.models.curves.level_paths import trace_level_sets
 
 X_RANGE, Y_RANGE = (0.0, 20.0), (0.0, 15.0)
-MODELS = {
+MODELS: dict[str, Any] = {
     "cobb-douglas": CobbDouglas(alpha=0.3, beta=0.7),
     "ces-0.5": CES(alpha=0.4, rho=0.5),
     "ces-negative": CES(alpha=0.5, rho=-1.0),
