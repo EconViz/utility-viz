@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v2.0.0b6 (2026-10-22)
+
+### Fixes
+
+- Axis labels that mix text and math, such as `"price $p$"`, render instead of failing to parse, and
+  labels in other scripts (Chinese, for example) are set as text in the text font instead of the math
+  font. A plain ASCII label such as `"x_1"` is still one math expression, and its output is unchanged.
+
 ## v2.0.0b5 (2026-10-22)
 
 ### Changes

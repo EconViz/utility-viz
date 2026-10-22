@@ -511,7 +511,7 @@ wheels = [
 
 [[package]]
 name = "econ-viz"
-version = "2.0.0b5"
+version = "2.0.0b6"
 source = { editable = "packages/econ-viz" }
 dependencies = [
     { name = "utility-viz" },
@@ -2331,7 +2331,7 @@ wheels = [
 
 [[package]]
 name = "utility-viz"
-version = "2.0.0b5"
+version = "2.0.0b6"
 source = { editable = "." }
 dependencies = [
     { name = "bezierkit" },
