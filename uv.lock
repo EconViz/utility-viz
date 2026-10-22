@@ -89,16 +89,16 @@ wheels = [
 
 [[package]]
 name = "bezierkit"
-version = "1.0.1"
+version = "1.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fd/6d/92ea380585bf7f6fe326c96b714bb6f674b65b9311d53bb14a77d2b799a6/bezierkit-1.0.1.tar.gz", hash = "sha256:917357ec0092c0a64f025bc7221e927e39f7bfb6f918999b5b1f602654c05ce0", size = 169167, upload-time = "2026-10-04T09:00:25.596Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/df/36/acba99ef8c4f9ef60b158931cfb6c154c6b53c0e5b305fbe33305f730f53/bezierkit-1.1.0.tar.gz", hash = "sha256:0623ec9a6a6bd76d650ff41edab701e0ceed9a511099e08e607d392ddebd2e49", size = 175614, upload-time = "2026-10-22T05:42:30.865Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/76/74/e60a613ea5f855cd11d8cc849dd5f0914b0caa9115caa6cc8a133f3949e4/bezierkit-1.0.1-py3-none-any.whl", hash = "sha256:01f13a79e918cff56577fd2c55005d028125446efd1af555d5f53edd14233553", size = 52493, upload-time = "2026-10-04T09:00:24.206Z" },
+    { url = "https://files.pythonhosted.org/packages/7b/1a/e382527d19574e92d1c312a6c4615636aa74b0d9ab62a3e7c7b94b20389b/bezierkit-1.1.0-py3-none-any.whl", hash = "sha256:aa335bc523273704a0420ccfbd9ce2de52d5d054c57b43bfe17f297a530dbaf0", size = 54887, upload-time = "2026-10-22T05:42:29.607Z" },
 ]
 
 [[package]]
@@ -1282,7 +1282,7 @@ wheels = [
 
 [[package]]
 name = "mosaickit"
-version = "0.9.2"
+version = "1.0.0rc2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "glyphkit" },
@@ -1293,9 +1293,9 @@ dependencies = [
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/00/40/b47527cde87f2ced3b581161f0f86dfeae04c76fd8fd1f77687aca2aaf71/mosaickit-0.9.2.tar.gz", hash = "sha256:8ebabcb9582df7012a22a3efdfb8430fc9ffdefcac57f060d70948a11101154c", size = 276861, upload-time = "2026-10-21T06:02:11.217Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ec/e2/275a933541e19ef8c5fcda4f68cc183ea6d6a66f444d0c2e3ea7763435f2/mosaickit-1.0.0rc2.tar.gz", hash = "sha256:44551ec9045e8d837c0ada957e7a1c33299259d5517298f79de1a3906647146e", size = 282181, upload-time = "2026-10-22T05:52:38.585Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/37/d9/915656b40e52fa3c0db081919c250ebeab6f1545ec0b12925933e2f514b1/mosaickit-0.9.2-py3-none-any.whl", hash = "sha256:648f40fcc83ae110b6422220c795ff4149eb9b9510ba43b4641901414c89b0db", size = 116948, upload-time = "2026-10-21T06:02:09.561Z" },
+    { url = "https://files.pythonhosted.org/packages/8f/da/9a568cfb20ad4dab3553d3538b941ad006cf676553482e8902797b03cdae/mosaickit-1.0.0rc2-py3-none-any.whl", hash = "sha256:7f40c973060face4831c88c6a7c84baf7f3bbdeedd411c2b1a1f2b7938f5532b", size = 118955, upload-time = "2026-10-22T05:52:36.909Z" },
 ]
 
 [[package]]
@@ -2373,14 +2373,14 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "bezierkit", specifier = ">=1.0.1,<2.0.0" },
+    { name = "bezierkit", specifier = ">=1.1.0,<2.0.0" },
     { name = "ipython", marker = "extra == 'all'", specifier = ">=8.0.0" },
     { name = "ipython", marker = "extra == 'interactive'", specifier = ">=8.0.0" },
     { name = "ipywidgets", marker = "extra == 'all'", specifier = ">=8.0.0" },
     { name = "ipywidgets", marker = "extra == 'interactive'", specifier = ">=8.0.0" },
     { name = "kinetickit", extras = ["raster"], marker = "extra == 'all'", specifier = ">=1.0.0b2,<2.0.0" },
     { name = "kinetickit", extras = ["raster"], marker = "extra == 'animation'", specifier = ">=1.0.0b2,<2.0.0" },
-    { name = "mosaickit", specifier = ">=0.9.2,<0.10.0" },
+    { name = "mosaickit", specifier = ">=1.0.0rc2,<2.0.0" },
     { name = "numpy", specifier = ">=1.24.0" },
     { name = "scipy", specifier = ">=1.13.0,<2.0.0" },
     { name = "sympy", specifier = ">=1.12.0,<2.0.0" },
