@@ -312,12 +312,12 @@ and each package decides which role its elements use. In utility-viz:
 
 | role | elements |
 |---|---|
-| ink | axes, labels |
-| primary | indifference curves, Walrasian equilibrium |
+| ink | axes, labels, compensated budget |
+| primary | indifference curves |
 | subtle | the curves beside a highlighted one |
-| secondary | consumption paths, compensated budget |
+| secondary | consumption paths |
 | constraint | budget line and its shading |
-| accent | equilibrium and other points, the core |
+| accent | equilibrium and other points, the core, Walrasian equilibrium |
 | muted | rays, subsistence lines, price line, contract curve |
 | series 1, 2, 3 | substitution effect, income effect, kinks |
 

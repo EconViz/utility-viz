@@ -67,7 +67,8 @@ class MonochromeTheme(Theme):
 
     @property
     def core_marker(self) -> Marker:
-        return Marker(color=self.core_color, shape="P")
+        # A plus, the accepted shape closest to Matplotlib's filled plus "P".
+        return Marker(color=self.core_color, shape="+")
 
     @property
     def endowment_marker(self) -> Marker:

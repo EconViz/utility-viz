@@ -32,9 +32,9 @@
 - New built-in theme `manual`: the figures of the manual and the playground. `base = "manual"` gives
   the same figures as the playground's full settings file.
 - Colour changes in the colour themes (`default`, `colorblind`, `nord`, `paper`, `presentation`,
-  `monochrome`): `core` takes the accent colour and `walrasian` the primary colour; `subsistence`,
-  `contract` and `price` take the muted colour; `compensated_budget` takes the secondary colour (the
-  colour of the consumption paths).
+  `monochrome`): `core` and `walrasian` take the accent colour; `subsistence`, `contract` and `price`
+  take the muted colour; `compensated_budget` takes the ink colour (the axes' dark line).
+- `themes.monochrome.core_marker` no longer raises: its shape is `"+"` instead of the rejected `"P"`.
 - `presentation` now uses the default sizes times the shared scales (lines x1.5, markers x1.3, labels
   x1.25), so its lines, points and labels are slightly different from 2.0.0b7.
 - `Theme` gains `kink_markersize` and `bliss_markersize`. `utility-viz plot --theme` accepts every

@@ -128,3 +128,27 @@ def test_monochrome_keeps_its_line_styles():
     assert isinstance(themes.monochrome, MonochromeTheme)
     assert themes.monochrome.walrasian_markersize == 11.0
     assert themes.monochrome.budget_stroke.style is LineStyle.DASHED
+
+
+@pytest.mark.parametrize("name", roles.THEME_NAMES)
+def test_every_style_of_every_builtin_theme_can_be_read(name):
+    theme = build_theme(name)
+    styles = [
+        attr
+        for attr in dir(type(theme))
+        if isinstance(getattr(type(theme), attr), property) and attr.endswith(("_marker", "_stroke", "_label", "_fill"))
+    ]
+    assert "core_marker" in styles
+    for attr in styles:
+        getattr(theme, attr)  # raises InvalidParameterError on a rejected shape or colour
+
+
+def test_monochrome_core_marker_is_a_plus():
+    assert themes.monochrome.core_marker.shape == "+"
+
+
+def test_walrasian_is_accent_and_compensated_budget_is_ink():
+    assert themes.manual.walrasian_color == "#1a1a1a"
+    assert themes.manual.compensated_budget_color == "#1a1a1a"
+    assert themes.default.walrasian_color == themes.default.eq_color
+    assert themes.default.compensated_budget_color == themes.default.axis_color

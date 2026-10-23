@@ -49,7 +49,11 @@ def test_edgeworth_default_marker_tokens():
     endowment = _layer(box, "endowment", MarkerLayer)
     walrasian = _layer(box, "walrasian", MarkerLayer)
     assert endowment.marker.size == 6**2
-    assert (walrasian.marker.color.to_hex(), walrasian.marker.size, walrasian.marker.shape) == ("#377EB8", 10**2, "*")
+    assert (walrasian.marker.color.to_hex(), walrasian.marker.size, walrasian.marker.shape) == (
+        "#E41A1C",
+        10**2,
+        "*",
+    )  # accent
 
 
 def test_bliss_and_subsistence_default_tokens():
