@@ -222,7 +222,7 @@ figure = Figure(
 `font` applies to titles, axis labels, annotations, curve labels, and legends.
 A character the font lacks, such as a Chinese character in the default fonts,
 raises an error naming the text: give the slot a font file that has it. The same
-three settings work in `utility-viz.toml` (`[font] text`, `[font] math` and
+three settings work in `econ-viz.toml` (`[font] text`, `[font] math` and
 `[fonts]`) and in principle-viz. Installed font family names and the old math
 font names (`"stix"`, `"cm"`, ...) are no longer accepted. TikZ output uses the
 LaTeX document's fonts, so the three generic fonts are mapped (`sans` →
@@ -249,7 +249,10 @@ S = slutsky_matrix(CobbDouglas(alpha=0.4, beta=0.6), px=2.0, py=3.0, income=60.0
 
 ## Settings file
 
-Keep your style in a `utility-viz.toml` and load it once. Section names match
+Keep your style in an `econ-viz.toml` and load it once. It is the settings file every EconViz
+package reads: the others use `base`, `[font]`, `[fonts]` and the `background`, `axis` and
+`label` colours, and keep their own settings in one table each (for example `[principle.color]`),
+which utility-viz skips. Section names match
 Theme properties (`[stroke.budget]` is `theme.budget_stroke`), fields match the
 style objects, and anything left out keeps the default:
 
@@ -270,11 +273,11 @@ position = "bottom"
 ```python
 from utility_viz import Config
 
-Config.load("utility-viz.toml").use()  # diagrams created from now on use it
+Config.load("econ-viz.toml").use()  # diagrams created from now on use it
 ```
 
 `utility-viz init` writes a commented template, and `utility-viz plot --config
-utility-viz.toml ...` uses the same file. Arguments passed to a method still win
+econ-viz.toml ...` uses the same file. Arguments passed to a method still win
 over the file.
 
 ## CLI
@@ -304,7 +307,7 @@ utility-viz plot --model cobb-douglas --alpha 0.5 --beta 0.5 \
 | Distribution | `pip install econ-viz` | `pip install utility-viz` |
 | Import | `import econ_viz` | `import utility_viz` |
 | CLI | `econ-viz` | `utility-viz` |
-| Config file | `econ-viz.toml` | `utility-viz.toml` (section names unchanged) |
+| Config file | `econ-viz.toml` | `econ-viz.toml`, shared by every EconViz package (2.0 betas through b6 used `utility-viz.toml`) |
 
 **Which package to install.** `utility-viz` ships only `utility_viz` and the `utility-viz` command: it has no
 `econ_viz` package and no `econ-viz` command. `econ-viz` 2.x (same version number) is a thin compatibility
@@ -326,15 +329,15 @@ to drop the compatibility layer.
   "deprecated since 2.0.0, removed in 3.0.0" and the replacement. `Figure`, `Layout` and `Animator` map to
   their current 2.x equivalents; their declarative replacements (`CanvasGrid`, `Animation`) are planned and
   named in the message as such.
-- Config lookup: explicit path, then `utility-viz.toml`, then legacy `econ-viz.toml` (with a warning), then
-  defaults. If both files exist the new one wins and the legacy one is ignored with a warning.
+- Config lookup: explicit path, then `econ-viz.toml`, then `utility-viz.toml` (the 2.0 beta name, with a
+  warning), then defaults. If both files exist the new one wins and the legacy one is ignored with a warning.
   `Config.load()` with no argument follows the file order and raises if neither file exists (as in 1.x);
   `Config.discover()` falls back to defaults; `Config.load("file.toml")` reads exactly that file.
   `utility-viz plot` applies the same lookup in the current directory when `--config` is not given.
 - The `econ-viz` command prints a deprecation warning and forwards to `utility-viz`.
-- `utility-viz init --migrate` writes `utility-viz.toml` from `econ-viz.toml` and keeps the old file.
+- `utility-viz init --migrate` writes `econ-viz.toml` from `utility-viz.toml` and keeps the old file.
 
-**Removal boundary (3.0.0).** The `econ_viz` package, the `econ-viz` command and `econ-viz.toml` lookup are
+**Removal boundary (3.0.0).** The `econ_viz` package, the `econ-viz` command and `utility-viz.toml` lookup are
 removed in 3.0.0, not 2.0.0. Only the documented 1.x public API is covered; undocumented deep module paths
 (for example `econ_viz.canvas.renderers.*`) resolve on a best-effort basis and may disappear at any time.
 Internal `utility_viz.core.*` modules are advanced APIs and not part of the compatibility contract.

@@ -42,8 +42,11 @@ if sys.version_info >= (3, 11):
 else:  # pragma: no cover - exercised on Python 3.10 only
     import tomli as tomllib
 
-DEFAULT_FILE = "utility-viz.toml"
-LEGACY_FILE = "econ-viz.toml"  # 1.x name; still read throughout 2.x, removed in 3.0
+from mosaickit.econ_toml import PACKAGE_TABLES
+
+# The file every EconViz package reads; utility-viz keeps its settings at the top level.
+DEFAULT_FILE = "econ-viz.toml"
+LEGACY_FILE = "utility-viz.toml"  # the 2.0 beta name; still read with a warning, removed in 3.0
 
 # Section -> (style class, property-name pattern).
 _STYLES = {
@@ -55,12 +58,14 @@ _STYLES = {
 # Friendlier names for a few properties.
 _ALIASES = {"equilibrium": "eq", "substitution_effect": "sub_effect", "income_effect": "inc_effect"}
 _TOP_LEVEL = {"base", "font", "fonts", "color"} | set(_STYLES) | {"legend"}
+# Other packages' tables in the shared file, skipped here.
+_OTHER_PACKAGES = PACKAGE_TABLES
 _OVERRIDES = "_ev_overrides"
 
 
 @dataclass(frozen=True)
 class Config:
-    """A Theme plus font choices, usually read from ``utility-viz.toml``.
+    """A Theme plus font choices, usually read from ``econ-viz.toml``.
 
     Parameters
     ----------
@@ -84,8 +89,8 @@ class Config:
         """Read a TOML file.
 
         With an explicit *path* that file is read (and must exist). With no
-        *path*, :func:`find_config_file` decides: ``utility-viz.toml``, then the
-        legacy ``econ-viz.toml`` (with a deprecation warning). As in 1.x,
+        *path*, :func:`find_config_file` decides: ``econ-viz.toml``, then the
+        2.0 beta name ``utility-viz.toml`` (with a deprecation warning). As in 1.x,
         :class:`InvalidParameterError` is raised when neither exists; use
         :meth:`discover` to fall back to the built-in defaults instead.
         """
@@ -100,8 +105,8 @@ class Config:
     def discover(cls, path: str | Path | None = None, *, directory: str | Path | None = None) -> Config:
         """Resolve a Config using the documented lookup order.
 
-        1. the explicit *path*, 2. ``utility-viz.toml``, 3. legacy ``econ-viz.toml``
-        (deprecated), 4. built-in defaults. Files 2 and 3 are looked up in
+        1. the explicit *path*, 2. ``econ-viz.toml``, 3. the 2.0 beta name
+        ``utility-viz.toml`` (deprecated), 4. built-in defaults. Files 2 and 3 are looked up in
         *directory* (default: the current working directory).
         """
         found = find_config_file(path, directory=directory, stacklevel=3)
@@ -125,7 +130,7 @@ class Config:
         Relative font paths are resolved against *base_dir* (the TOML file's directory when read
         from a file).
         """
-        unknown = set(data) - _TOP_LEVEL
+        unknown = set(data) - _TOP_LEVEL - _OTHER_PACKAGES
         if unknown:
             raise InvalidParameterError(
                 f"{source}: unknown section(s) {', '.join(sorted(unknown))}; "
@@ -196,7 +201,7 @@ def find_config_file(
 ) -> Path | None:
     """Locate the settings file, or ``None`` when the defaults should be used.
 
-    Order: explicit *path*; ``utility-viz.toml``; legacy ``econ-viz.toml`` (warns);
+    Order: explicit *path*; ``econ-viz.toml``; the 2.0 beta name ``utility-viz.toml`` (warns);
     otherwise ``None``. When both named files exist the new one wins and the
     legacy one is ignored with a warning.
     """
@@ -215,7 +220,8 @@ def find_config_file(
     if legacy.is_file():
         warn_deprecated(
             f"config file {LEGACY_FILE!r}",
-            f"{DEFAULT_FILE!r} (run `utility-viz init --migrate`; section names are unchanged)",
+            f"{DEFAULT_FILE!r}, the file every EconViz package reads "
+            "(run `utility-viz init --migrate`; section names are unchanged)",
             stacklevel=stacklevel,
         )
         return legacy
@@ -338,7 +344,7 @@ def _themed(base: Theme, fields: dict, properties: dict) -> Theme:
 
 
 def template() -> str:
-    """A commented ``utility-viz.toml`` listing every setting name."""
+    """A commented ``econ-viz.toml`` listing every setting name."""
     theme = themes.default
 
     def names(pattern: str) -> str:
@@ -346,8 +352,8 @@ def template() -> str:
 
     colours = sorted(f.name[: -len("_color")] for f in dataclasses.fields(theme) if f.name.endswith("_color"))
     base_choices = ", ".join(_builtin_theme_names())
-    return f"""# utility-viz settings. Load with:  Config.load("utility-viz.toml").use()
-# or on the command line:          utility-viz plot --config utility-viz.toml ...
+    return f"""# EconViz settings, shared by every EconViz package. Load with:  Config.load("econ-viz.toml").use()
+# or on the command line:          utility-viz plot --config econ-viz.toml ...
 # Anything left out keeps the built-in default; delete what you don't need.
 
 base = "default"                 # built-in theme to start from: {base_choices}
@@ -390,4 +396,8 @@ base = "default"                 # built-in theme to start from: {base_choices}
 
 [legend]                         # position, fontsize, frame, columns, visible, opacity
 # position = "auto"              # auto, upper right, ..., top, bottom, left, right
+
+# Other EconViz packages read base, [font], [fonts] and the background, axis and
+# label colours above, and keep their own settings in one table each, for example
+# [principle.color]. utility-viz skips those tables.
 """

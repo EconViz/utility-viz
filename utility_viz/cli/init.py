@@ -1,4 +1,4 @@
-"""``init`` sub-command — write a commented utility-viz.toml template or migrate a legacy file."""
+"""``init`` sub-command — write a commented econ-viz.toml template or migrate a legacy file."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from utility_viz.core.config.settings import LEGACY_FILE, tomllib
 def cmd_init(args: argparse.Namespace) -> None:
     """Write the template to *args.path*, refusing to overwrite unless ``--force``.
 
-    With ``--migrate`` the legacy ``econ-viz.toml`` next to *args.path* is copied
+    With ``--migrate`` the legacy ``utility-viz.toml`` next to *args.path* is copied
     to *args.path* (section names are unchanged) and the old file is left in place.
     """
     path = Path(args.path)
