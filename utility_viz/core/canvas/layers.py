@@ -11,8 +11,10 @@ from mosaickit import LegendLayer, LegendStyle, MarkerLayer, PathLayer, TextLaye
 from utility_viz.core.scenes import budget_layers, decomposition_layers, equilibrium_layers, indifference_layers
 from utility_viz.core.scenes.path import smooth_path
 from utility_viz.core.scenes.styles import (
+    nudged,
     to_mosaic_fill,
     to_mosaic_marker,
+    to_mosaic_nudge,
     to_mosaic_stroke,
     to_mosaic_text,
 )
@@ -154,28 +156,37 @@ class LayerMixin:
                 style.visible is not False,
             )
 
+        label_styles = {
+            "utility.decomposition.bundle.label": bundle_label,
+            "utility.decomposition.effect.substitution.label": substitution_label[1] or theme.effect_label,
+            "utility.decomposition.effect.income.label": income_label[1] or theme.effect_label,
+        }
+        decomposition_scene = decomposition_layers(
+            decomposition,
+            y_max=self.y_max,
+            budget_strokes=budgets,
+            bundle_marker=to_mosaic_marker(marker),
+            bundle_text=to_mosaic_text(bundle_label, font=self.font),
+            bundle_text_offset=bundle_offset,
+            bundle_text_anchor=bundle_anchor,
+            bundle_text_visible=bundle_label.visible is not False,
+            substitution_stroke=to_mosaic_stroke(sub),
+            income_stroke=to_mosaic_stroke(inc),
+            projection_stroke=to_mosaic_stroke(projection_selected),
+            guide_stroke=to_mosaic_stroke(guide_selected),
+            range_strokes=(to_mosaic_stroke(range_sub), to_mosaic_stroke(range_inc)),
+            substitution_label=effect_label(substitution_label),
+            income_label=effect_label(income_label),
+            range_y=(getattr(substitution, "y", None), getattr(income, "y", None)),
+            show_arrows=show_arrows,
+            show_x_projections=show_x_projections,
+            label_effects=label_effects,
+        )
         self.extend(
-            decomposition_layers(
-                decomposition,
-                y_max=self.y_max,
-                budget_strokes=budgets,
-                bundle_marker=to_mosaic_marker(marker),
-                bundle_text=to_mosaic_text(bundle_label, font=self.font),
-                bundle_text_offset=bundle_offset,
-                bundle_text_anchor=bundle_anchor,
-                bundle_text_visible=bundle_label.visible is not False,
-                substitution_stroke=to_mosaic_stroke(sub),
-                income_stroke=to_mosaic_stroke(inc),
-                projection_stroke=to_mosaic_stroke(projection_selected),
-                guide_stroke=to_mosaic_stroke(guide_selected),
-                range_strokes=(to_mosaic_stroke(range_sub), to_mosaic_stroke(range_inc)),
-                substitution_label=effect_label(substitution_label),
-                income_label=effect_label(income_label),
-                range_y=(getattr(substitution, "y", None), getattr(income, "y", None)),
-                show_arrows=show_arrows,
-                show_x_projections=show_x_projections,
-                label_effects=label_effects,
-            )
+            nudged(layer, label_styles[layer.role])
+            if isinstance(layer, TextLayer) and layer.role in label_styles
+            else layer
+            for layer in decomposition_scene
         )
 
         if show_curves and decomposition.func is not None:
@@ -212,6 +223,7 @@ class LayerMixin:
                             anchor=layer.anchor,
                             math=True,
                             z_index=layer.z_index,
+                            nudge=to_mosaic_nudge(label_style),
                         )
                         if isinstance(layer, TextLayer)
                         else layer
@@ -420,6 +432,7 @@ class LayerMixin:
                     math=True,
                     visible=style.visible is not False,
                     z_index=7,
+                    nudge=to_mosaic_nudge(style),
                 )
             )
         return self
@@ -624,6 +637,7 @@ def _add_bliss_point(
             id=f"{layer_id}.bliss.label",
             role="utility.indifference.bliss.label",
             z_index=6,
+            nudge=to_mosaic_nudge(style),
         )
     )
 
@@ -666,4 +680,5 @@ def _restyle_text(layer, style: Label, font: str | None):
         math=layer.math,
         visible=style.visible is not False,
         z_index=layer.z_index,
+        nudge=to_mosaic_nudge(style),
     )

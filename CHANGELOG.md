@@ -2,6 +2,54 @@
 
 <!-- version list -->
 
+## v2.0.0b8 (2026-10-23)
+
+### Changes
+
+- utility-viz's own settings in `econ-viz.toml` live under `[utility]`: `[utility.color]`,
+  `[utility.stroke.<name>]`, `[utility.marker.<name>]`, `[utility.label.<name>]`,
+  `[utility.fill.<name>]` and `[utility.legend]`. The top level keeps what every EconViz package
+  shares: `base`, `[font]`, `[fonts]` and the `background`, `axis` and `label` colours.
+- utility-viz no longer parses the file itself: mosaickit reads it from the schema utility-viz
+  declares (`utility_viz.core.config.settings.SCHEMA`), checks every value and reports mistakes with
+  the file, the table and a did-you-mean suggestion. Errors are still `InvalidParameterError`; several
+  messages changed wording.
+- The 2.0.0b7 layout, with utility-viz's tables at the top level, is still read with one
+  `UtilityVizDeprecationWarning` per load (removed in 3.0). A key under `[utility]` wins over the same
+  key at the top level.
+- `utility-viz init` writes the new layout. `utility-viz init --migrate` moves utility-viz's tables
+  under `[utility]`, keeping comments: it rewrites `utility-viz.toml` into `econ-viz.toml` (the old file
+  is kept) or, without one, a legacy-layout `econ-viz.toml` in place.
+- Colours in the file are checked when it is read, and `utility-viz plot --config` resolves relative
+  font paths against the file's directory, as `Config.load` does.
+- utility-viz registers its `Config` under the `econviz.config` entry point, so
+  `mosaickit.econ_toml.use()` activates it together with the other installed EconViz packages.
+- Requires `mosaickit>=1.0.0rc6`.
+- The built-in themes are mosaickit's shared themes (`mosaickit.themes.SHARED_THEMES`), so a
+  `base` name means the same look in every EconViz package. `utility_viz.core.themes.roles` maps
+  each element to a role (`ic` -> primary, `budget` -> constraint, `eq` -> accent, ...) and holds
+  utility-viz's own sizes; theme scales multiply them. Every theme stays importable where it was.
+- New built-in theme `manual`: the figures of the manual and the playground. `base = "manual"` gives
+  the same figures as the playground's full settings file.
+- Colour changes in the colour themes (`default`, `colorblind`, `nord`, `paper`, `presentation`,
+  `monochrome`): `core` and `walrasian` take the accent colour; `subsistence`, `contract` and `price`
+  take the muted colour; `compensated_budget` takes the ink colour (the axes' dark line).
+- `themes.monochrome.core_marker` no longer raises: its shape is `"+"` instead of the rejected `"P"`.
+- `presentation` now uses the default sizes times the shared scales (lines x1.5, markers x1.3, labels
+  x1.25), so its lines, points and labels are slightly different from 2.0.0b7.
+- `Theme` gains `kink_markersize` and `bliss_markersize`. `utility-viz plot --theme` accepts every
+  built-in theme, including `colorblind` and `manual`.
+- There is no dark theme any more. `themes.dark`, `base = "dark"` and `--theme dark` emit a
+  `UtilityVizDeprecationWarning` and use `default` throughout 2.x (an error in 3.0). Set
+  `[color] background` for an opaque backdrop when exporting SVG or PNG.
+- Label nudges: `Label(top=..., bottom=..., left=..., right=...)` moves one placed label by a
+  length, a number of points or a string such as `"10pt"`, `"0.5em"` (the label's font size) or
+  `"2mm"`, for example `cvs.add_equilibrium(eq, label=Label(top="10pt"))` or
+  `cvs.add_point(5, 3, label=Label(text="A", left="6pt"))`. The label is placed as before and then
+  moved (a mosaickit `Nudge`), so later labels still avoid it. `[utility.label.<name>] top = "2pt"`
+  sets a default for every label of that kind (pt, mm, cm or in; no em in the file); a label's own
+  value replaces it for that direction. Without nudges every figure is unchanged.
+
 ## v2.0.0b7 (2026-10-23)
 
 ### Changes

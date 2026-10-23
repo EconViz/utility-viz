@@ -7,7 +7,7 @@ from mosaickit import TextLayer
 from utility_viz.core.canvas.base import Canvas
 from utility_viz.core.layout.figure import Figure
 from utility_viz.core.scenes.consumer.demand import demand_marker_layers, marshallian_demand_layers
-from utility_viz.core.scenes.styles import to_mosaic_marker, to_mosaic_stroke, to_mosaic_text
+from utility_viz.core.scenes.styles import to_mosaic_marker, to_mosaic_nudge, to_mosaic_stroke, to_mosaic_text
 from utility_viz.core.styles.axis import Axis
 from utility_viz.core.styles.label import Label, split_label
 from utility_viz.core.styles.legend import Legend
@@ -199,5 +199,6 @@ def _add_demand_label(canvas: Canvas, point, fallback_text: str, label: Label | 
             math=True,
             visible=style.visible is not False,
             z_index=7,
+            nudge=to_mosaic_nudge(style),
         )
     )

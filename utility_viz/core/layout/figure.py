@@ -14,7 +14,7 @@ from mosaickit import Layout as MosaicLayout
 from utility_viz.core.canvas.base import Canvas
 from utility_viz.core.constants.canvas import DEFAULT_DPI
 from utility_viz.core.errors.exceptions import InvalidParameterError
-from utility_viz.core.scenes.styles import to_mosaic_text
+from utility_viz.core.scenes.styles import to_mosaic_nudge, to_mosaic_text
 from utility_viz.core.styles.axis import Axis
 from utility_viz.core.styles.label import Label, split_label
 from utility_viz.core.styles.stroke import Stroke
@@ -152,6 +152,7 @@ class Figure:
                 offset=(0, 24),
                 anchor="bottom",
                 z_index=20,
+                nudge=to_mosaic_nudge(self.title_style),
             )
         )
 

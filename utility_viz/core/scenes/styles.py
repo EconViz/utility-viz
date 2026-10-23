@@ -8,7 +8,8 @@ about a concrete rendering backend.
 
 from __future__ import annotations
 
-from typing import Any
+import dataclasses
+from typing import Any, TypeVar
 
 from mosaickit import (
     ArrowStyle as MosaicArrowStyle,
@@ -29,6 +30,7 @@ from mosaickit import (
 from mosaickit import (
     Theme as MosaicTheme,
 )
+from mosaickit.styles.nudge import Nudge, nudge_from
 
 from utility_viz.core.styles.fill import Fill
 from utility_viz.core.styles.label import Label
@@ -117,6 +119,35 @@ def to_mosaic_text(value: Label | None, *, font: str | None = None) -> TextStyle
         font=font,
         opacity=label.opacity,
     )
+
+
+# The font size an em is measured against when the label has none: mosaickit's text size.
+_DEFAULT_FONT_SIZE = 12.0
+
+_L = TypeVar("_L")
+
+
+def to_mosaic_nudge(value: Label | None) -> Nudge | None:
+    """The label's ``top`` / ``bottom`` / ``left`` / ``right`` as a mosaickit Nudge.
+
+    ``None`` when the label sets none of them, so a label without a nudge is drawn exactly
+    as before. ``em`` is the label's font size.
+    """
+    if value is None or all(getattr(value, name) is None for name in ("top", "bottom", "left", "right")):
+        return None
+    return nudge_from(
+        top=value.top,
+        bottom=value.bottom,
+        left=value.left,
+        right=value.right,
+        font_size=value.fontsize if value.fontsize is not None else _DEFAULT_FONT_SIZE,
+    )
+
+
+def nudged(layer: _L, value: Label | None) -> _L:
+    """*layer* moved by the nudge of *value*; *layer* itself when there is none."""
+    nudge = to_mosaic_nudge(value)
+    return layer if nudge is None else dataclasses.replace(layer, nudge=nudge)  # type: ignore[type-var]
 
 
 def to_mosaic_theme(value: Any, *, font: str | None = None) -> MosaicTheme:

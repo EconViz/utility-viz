@@ -65,7 +65,7 @@ def test_unknown_attribute_raises():
         ("econ_viz.optimizer", "DecompositionMethod"),
         ("econ_viz.optimizer.solver", "solve"),
         ("econ_viz.analysis", "HomogeneityAnalyzer"),
-        ("econ_viz.themes", "dark"),
+        ("econ_viz.themes", "nord"),
         ("econ_viz.themes.theme", "Theme"),
         ("econ_viz.themes.stroke", "Stroke"),
         ("econ_viz.consumer", "EdgeworthBox"),

@@ -111,7 +111,8 @@ def _register_plot(sub) -> argparse.ArgumentParser:
         default=None,
         metavar="NAME",
         help=(
-            "Theme name: default, nord, paper, monochrome, presentation, dark (default: default, or the config's base)."
+            "Theme name: manual, default, colorblind, monochrome, nord, paper, presentation "
+            "(default: default, or the config's base)."
         ),
     )
     p.add_argument(
@@ -144,7 +145,10 @@ def _register_init(sub) -> argparse.ArgumentParser:
     p.add_argument(
         "--migrate",
         action="store_true",
-        help="Create econ-viz.toml from utility-viz.toml in the same directory (the old file is kept).",
+        help=(
+            "Move utility-viz's top-level settings under [utility]: rewrites utility-viz.toml in the same "
+            "directory into econ-viz.toml (the old file is kept), or else econ-viz.toml in place."
+        ),
     )
     return p
 

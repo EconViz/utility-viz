@@ -75,18 +75,17 @@ def cmd_plot(args: argparse.Namespace) -> None:
 
 def _load_config(path: str, theme_name: str | None):
     """Read *path*; an explicit ``--theme`` replaces the file's ``base``."""
-    from utility_viz.core.config.settings import Config, tomllib
+    from pathlib import Path
+
+    from utility_viz.core.config.settings import Config, read_file
     from utility_viz.core.errors.exceptions import InvalidParameterError
 
     try:
-        with open(path, "rb") as handle:
-            data = tomllib.load(handle)
+        data = read_file(path)
         if theme_name:
             data["base"] = theme_name.lower()
-        return Config.from_dict(data, source=path)
-    except FileNotFoundError:
-        raise CliConfigError(f"config file not found: {path}") from None
-    except (tomllib.TOMLDecodeError, InvalidParameterError) as error:
+        return Config.from_dict(data, source=path, base_dir=Path(path).parent)
+    except InvalidParameterError as error:
         raise CliConfigError(str(error)) from None
 
 

@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from mosaickit import TextLayer
+
 from utility_viz.core.diagrams.consumer.edgeworth.exchange import check_allocation, locate_walrasian
 from utility_viz.core.diagrams.consumer.edgeworth.methods.lines import LinesMixin
 from utility_viz.core.scenes.consumer.edgeworth import edgeworth_point_layers
-from utility_viz.core.scenes.styles import to_mosaic_marker, to_mosaic_text
+from utility_viz.core.scenes.styles import nudged, to_mosaic_marker, to_mosaic_text
 from utility_viz.core.styles.label import Label, split_label
 from utility_viz.core.styles.marker import Marker
 from utility_viz.core.styles.placement import placement
@@ -36,15 +38,18 @@ class PointsMixin(LinesMixin):
         selected = (marker or Marker()).merged_over(selected)
         label_offset, label_anchor = _label_placement(label_style)
         self.extend(
-            edgeworth_point_layers(
-                self.endowment,
-                layer_id=self._next_id("endowment"),
-                label=text or "e",
-                marker=to_mosaic_marker(selected),
-                text=to_mosaic_text(label_style),
-                text_offset=label_offset,
-                text_anchor=label_anchor,
-                text_visible=label_style.visible is not False,
+            _nudged_labels(
+                edgeworth_point_layers(
+                    self.endowment,
+                    layer_id=self._next_id("endowment"),
+                    label=text or "e",
+                    marker=to_mosaic_marker(selected),
+                    text=to_mosaic_text(label_style),
+                    text_offset=label_offset,
+                    text_anchor=label_anchor,
+                    text_visible=label_style.visible is not False,
+                ),
+                label_style,
             )
         )
         return self._as_box()
@@ -68,15 +73,18 @@ class PointsMixin(LinesMixin):
         selected = marker_value.merged_over(selected)
         label_offset, label_anchor = _label_placement(label_style)
         self.extend(
-            edgeworth_point_layers(
-                point,
-                layer_id=self._next_id("walrasian"),
-                label=text or r"X^*",
-                marker=to_mosaic_marker(selected),
-                text=to_mosaic_text(label_style),
-                text_offset=label_offset,
-                text_anchor=label_anchor,
-                text_visible=label_style.visible is not False,
+            _nudged_labels(
+                edgeworth_point_layers(
+                    point,
+                    layer_id=self._next_id("walrasian"),
+                    label=text or r"X^*",
+                    marker=to_mosaic_marker(selected),
+                    text=to_mosaic_text(label_style),
+                    text_offset=label_offset,
+                    text_anchor=label_anchor,
+                    text_visible=label_style.visible is not False,
+                ),
+                label_style,
             )
         )
         _ = contract_stroke
@@ -100,3 +108,8 @@ def _label_placement(style: Label) -> tuple[tuple[float, float], str]:
     )
     anchor = "-".join(part for part in (vertical, horizontal) if part != "center") or "center"
     return offset, anchor
+
+
+def _nudged_labels(layers, style: Label):
+    """*layers* with the label's nudge applied to their text."""
+    return tuple(nudged(layer, style) if isinstance(layer, TextLayer) else layer for layer in layers)
