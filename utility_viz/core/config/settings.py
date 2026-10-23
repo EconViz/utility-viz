@@ -44,6 +44,7 @@ from utility_viz.core.styles.label import Label
 from utility_viz.core.styles.legend import Legend
 from utility_viz.core.styles.marker import Marker
 from utility_viz.core.styles.stroke import Stroke
+from utility_viz.core.themes import roles
 from utility_viz.core.themes.theme import Theme
 
 # The file every EconViz package reads.
@@ -213,7 +214,8 @@ def _hint(value: str, choices: list[str]) -> str:
 
 
 def _builtin_theme_names() -> list[str]:
-    return [name for name in themes.__all__ if isinstance(getattr(themes, name, None), Theme)]
+    extra = [name for name in themes.__all__ if isinstance(getattr(themes, name, None), Theme)]
+    return [*roles.THEME_NAMES, *(name for name in extra if name not in roles.THEME_NAMES)]
 
 
 def _style_names(pattern: str) -> list[str]:
@@ -326,6 +328,9 @@ def _warn_legacy_layout(message: str) -> None:
 
 
 def _base(name: str) -> Callable[[], _Draft]:
+    """The factory of base *name*; the built-in themes come from the theme roles."""
+    if name in roles.THEME_NAMES:
+        return lambda: _Draft(theme=roles.build_theme(name))
     return lambda: _Draft(theme=getattr(themes, name))
 
 

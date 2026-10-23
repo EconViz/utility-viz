@@ -111,7 +111,8 @@ def _register_plot(sub) -> argparse.ArgumentParser:
         default=None,
         metavar="NAME",
         help=(
-            "Theme name: default, nord, paper, monochrome, presentation, dark (default: default, or the config's base)."
+            "Theme name: manual, default, colorblind, monochrome, nord, paper, presentation, dark "
+            "(default: default, or the config's base)."
         ),
     )
     p.add_argument(

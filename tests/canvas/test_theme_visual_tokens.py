@@ -33,12 +33,12 @@ def _core(box, *, min_points=1, **kwargs):
 
 def test_edgeworth_default_line_tokens():
     core = _layer(_core(_box()), "utility.edgeworth.core", PathLayer)
-    assert (core.stroke.color.to_hex(), core.stroke.width) == ("#C0392B", 3)
+    assert (core.stroke.color.to_hex(), core.stroke.width) == ("#E41A1C", 3)  # accent
     price = _layer(_box().add_endowment(7, 3).add_price_line(1, 1), "price", PathLayer)
-    assert (price.stroke.color.to_hex(), price.stroke.width, price.stroke.dash.value) == ("#000000", 1.2, "dashed")
+    assert (price.stroke.color.to_hex(), price.stroke.width, price.stroke.dash.value) == ("#999999", 1.2, "dashed")
     contract = _layer(_box().add_contract_curve(), "contract", PathLayer)
     assert (contract.stroke.color.to_hex(), contract.stroke.width, contract.stroke.dash.value) == (
-        "#000000",
+        "#999999",  # muted
         1.2,
         "dashed",
     )
@@ -49,7 +49,7 @@ def test_edgeworth_default_marker_tokens():
     endowment = _layer(box, "endowment", MarkerLayer)
     walrasian = _layer(box, "walrasian", MarkerLayer)
     assert endowment.marker.size == 6**2
-    assert (walrasian.marker.color.to_hex(), walrasian.marker.size, walrasian.marker.shape) == ("#2E86AB", 10**2, "*")
+    assert (walrasian.marker.color.to_hex(), walrasian.marker.size, walrasian.marker.shape) == ("#377EB8", 10**2, "*")
 
 
 def test_bliss_and_subsistence_default_tokens():
@@ -59,7 +59,7 @@ def test_bliss_and_subsistence_default_tokens():
     canvas = Canvas(x_max=20, y_max=15).add_utility(model, levels=[1, 2])
     lines = [layer for layer in canvas.snapshot().ordered_layers if layer.role == "utility.indifference.subsistence"]
     assert len(lines) == 2
-    assert all((line.stroke.color.to_hex(), line.stroke.width) == ("#808080", 0.8) for line in lines)
+    assert all((line.stroke.color.to_hex(), line.stroke.width) == ("#999999", 0.8) for line in lines)  # muted
 
 
 def test_custom_theme_propagates_to_lines_and_markers():

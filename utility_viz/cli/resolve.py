@@ -46,14 +46,8 @@ def _themes_map() -> dict[str, object]:
     if _THEMES is None:
         import utility_viz.core.themes as themes
 
-        _THEMES = {
-            "default": themes.default,
-            "nord": themes.nord,
-            "paper": themes.paper,
-            "monochrome": themes.monochrome,
-            "presentation": themes.presentation,
-            "dark": themes.dark,
-        }
+        _THEMES = {name: themes.build_theme(name) for name in themes.THEME_NAMES}
+        _THEMES["dark"] = themes.dark
     return _THEMES
 
 

@@ -65,6 +65,10 @@ class Theme:
         Default stroke width for rays.
     kink_color : str
         Default colour for kink-point markers.
+    kink_markersize : float
+        Marker size of kink points.
+    bliss_markersize : float
+        Marker size of the bliss point of satiation preferences.
     sub_effect_color : str
         Default colour for substitution-effect arrows/labels.
     inc_effect_color : str
@@ -158,6 +162,10 @@ class Theme:
 
     # Kink markers
     kink_color: str = "#A65628"
+    kink_markersize: float = 4.0
+
+    # Bliss point of satiation preferences
+    bliss_markersize: float = 12.0
 
     # Price decomposition visuals
     sub_effect_color: str = "#FF7F00"
@@ -200,12 +208,12 @@ class Theme:
     @property
     def kink_marker(self) -> Marker:
         """Kink points of Leontief-type indifference curves."""
-        return Marker(color=self.kink_color, size=4.0, shape="o")
+        return Marker(color=self.kink_color, size=self.kink_markersize, shape="o")
 
     @property
     def bliss_marker(self) -> Marker:
         """Bliss point of satiation preferences. Colour ``None`` uses the curve colour."""
-        return Marker(size=12.0, shape="*")
+        return Marker(size=self.bliss_markersize, shape="*")
 
     @property
     def path_marker(self) -> Marker:

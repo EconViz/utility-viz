@@ -25,6 +25,20 @@
 - utility-viz registers its `Config` under the `econviz.config` entry point, so
   `mosaickit.econ_toml.use()` activates it together with the other installed EconViz packages.
 - Requires `mosaickit>=1.0.0rc6`.
+- The built-in themes are mosaickit's shared themes (`mosaickit.themes.SHARED_THEMES`), so a
+  `base` name means the same look in every EconViz package. `utility_viz.core.themes.roles` maps
+  each element to a role (`ic` -> primary, `budget` -> constraint, `eq` -> accent, ...) and holds
+  utility-viz's own sizes; theme scales multiply them. Every theme stays importable where it was.
+- New built-in theme `manual`: the figures of the manual and the playground. `base = "manual"` gives
+  the same figures as the playground's full settings file.
+- Colour changes in the colour themes (`default`, `colorblind`, `nord`, `paper`, `presentation`,
+  `monochrome`): `core` takes the accent colour and `walrasian` the primary colour; `subsistence`,
+  `contract` and `price` take the muted colour; `compensated_budget` takes the secondary colour (the
+  colour of the consumption paths).
+- `presentation` now uses the default sizes times the shared scales (lines x1.5, markers x1.3, labels
+  x1.25), so its lines, points and labels are slightly different from 2.0.0b7.
+- `Theme` gains `kink_markersize` and `bliss_markersize`. `utility-viz plot --theme` accepts every
+  built-in theme, including `colorblind` and `manual`.
 
 ## v2.0.0b7 (2026-10-23)
 

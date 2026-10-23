@@ -291,6 +291,28 @@ over the file. A mistake names the file, the table and, when the name is close,
 what you probably meant (`[utility.stroke] no such setting; did you mean 'budget'?`).
 `mosaickit.econ_toml.use()` loads the file for every installed EconViz package at once.
 
+### Themes
+
+`base` picks one of the shared EconViz themes: `manual` (the greys of the manual and the
+playground), `default`, `colorblind`, `monochrome`, `nord`, `paper` and `presentation`. The same
+name gives the same look in every EconViz package, because each theme gives a colour to a *role*
+and each package decides which role its elements use. In utility-viz:
+
+| role | elements |
+|---|---|
+| ink | axes, labels |
+| primary | indifference curves, Walrasian equilibrium |
+| subtle | the curves beside a highlighted one |
+| secondary | consumption paths, compensated budget |
+| constraint | budget line and its shading |
+| accent | equilibrium and other points, the core |
+| muted | rays, subsistence lines, price line, contract curve |
+| series 1, 2, 3 | substitution effect, income effect, kinks |
+
+Line widths and point sizes are utility-viz's own; a theme only scales them (`presentation`
+makes lines 1.5 times wider). `[utility.color]` and the other `[utility.*]` tables still change
+single elements on top of the base. The mapping lives in `utility_viz.core.themes.roles`.
+
 Files from 2.0.0b7 and earlier keep utility-viz's tables at the top level (`[color] ic`,
 `[stroke.budget]`, `[legend]`, ...). They are still read, with one deprecation warning per load;
 a key under `[utility]` wins over the same key at the top level. `utility-viz init --migrate`
