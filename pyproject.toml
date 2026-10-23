@@ -1,6 +1,6 @@
 [project]
 name = "utility-viz"
-version = "2.0.0b7"
+version = "2.0.0b8"
 description = "A Python toolkit for producing publication-quality microeconomics diagrams."
 readme = "README.md"
 authors = [{ name = "Pin Yue Sung", email = "contact@econ-viz.org" }]
@@ -19,8 +19,7 @@ dependencies = [
     "numpy (>=1.24.0)",
     "scipy (>=1.13.0,<2.0.0)",
     "sympy (>=1.12.0,<2.0.0)",
-    "tomli (>=2.0.0) ; python_version < '3.11'",
-    "mosaickit>=1.0.0rc5,<2.0.0",
+    "mosaickit>=1.0.0rc6,<2.0.0",
     "bezierkit>=1.1.0,<2.0.0",
 ]
 
@@ -31,6 +30,10 @@ all         = ["kinetickit[raster]>=1.0.0b2,<2.0.0", "ipywidgets (>=8.0.0)", "IP
 
 [project.scripts]
 utility-viz = "utility_viz.cli:main"
+
+# mosaickit.econ_toml.use() loads and activates every installed package's econ-viz.toml settings.
+[project.entry-points."econviz.config"]
+utility = "utility_viz.core.config.settings:Config"
 
 [project.urls]
 Homepage = "https://econ-viz.org"

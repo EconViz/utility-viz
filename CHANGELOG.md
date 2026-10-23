@@ -2,6 +2,30 @@
 
 <!-- version list -->
 
+## v2.0.0b8 (2026-10-23)
+
+### Changes
+
+- utility-viz's own settings in `econ-viz.toml` live under `[utility]`: `[utility.color]`,
+  `[utility.stroke.<name>]`, `[utility.marker.<name>]`, `[utility.label.<name>]`,
+  `[utility.fill.<name>]` and `[utility.legend]`. The top level keeps what every EconViz package
+  shares: `base`, `[font]`, `[fonts]` and the `background`, `axis` and `label` colours.
+- utility-viz no longer parses the file itself: mosaickit reads it from the schema utility-viz
+  declares (`utility_viz.core.config.settings.SCHEMA`), checks every value and reports mistakes with
+  the file, the table and a did-you-mean suggestion. Errors are still `InvalidParameterError`; several
+  messages changed wording.
+- The 2.0.0b7 layout, with utility-viz's tables at the top level, is still read with one
+  `UtilityVizDeprecationWarning` per load (removed in 3.0). A key under `[utility]` wins over the same
+  key at the top level.
+- `utility-viz init` writes the new layout. `utility-viz init --migrate` moves utility-viz's tables
+  under `[utility]`, keeping comments: it rewrites `utility-viz.toml` into `econ-viz.toml` (the old file
+  is kept) or, without one, a legacy-layout `econ-viz.toml` in place.
+- Colours in the file are checked when it is read, and `utility-viz plot --config` resolves relative
+  font paths against the file's directory, as `Config.load` does.
+- utility-viz registers its `Config` under the `econviz.config` entry point, so
+  `mosaickit.econ_toml.use()` activates it together with the other installed EconViz packages.
+- Requires `mosaickit>=1.0.0rc6`.
+
 ## v2.0.0b7 (2026-10-23)
 
 ### Changes

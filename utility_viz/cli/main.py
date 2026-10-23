@@ -144,7 +144,10 @@ def _register_init(sub) -> argparse.ArgumentParser:
     p.add_argument(
         "--migrate",
         action="store_true",
-        help="Create econ-viz.toml from utility-viz.toml in the same directory (the old file is kept).",
+        help=(
+            "Move utility-viz's top-level settings under [utility]: rewrites utility-viz.toml in the same "
+            "directory into econ-viz.toml (the old file is kept), or else econ-viz.toml in place."
+        ),
     )
     return p
 

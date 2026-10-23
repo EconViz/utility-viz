@@ -106,8 +106,10 @@ def test_explicit_arguments_beat_theme():
 def test_config_overrides_reach_scene_roles():
     config = Config.from_dict(
         {
-            "stroke": {"core": {"color": "#0F0F0F"}, "subsistence": {"color": "#00AA00"}},
-            "marker": {"walrasian": {"color": "#ABABAB"}},
+            "utility": {
+                "stroke": {"core": {"color": "#0F0F0F"}, "subsistence": {"color": "#00AA00"}},
+                "marker": {"walrasian": {"color": "#ABABAB"}},
+            }
         }
     )
     box = _core(_box(config.theme)).add_walrasian_equilibrium(1, 1)

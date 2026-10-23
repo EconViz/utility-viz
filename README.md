@@ -250,23 +250,32 @@ S = slutsky_matrix(CobbDouglas(alpha=0.4, beta=0.6), px=2.0, py=3.0, income=60.0
 ## Settings file
 
 Keep your style in an `econ-viz.toml` and load it once. It is the settings file every EconViz
-package reads: the others use `base`, `[font]`, `[fonts]` and the `background`, `axis` and
-`label` colours, and keep their own settings in one table each (for example `[principle.color]`),
-which utility-viz skips. Section names match
-Theme properties (`[stroke.budget]` is `theme.budget_stroke`), fields match the
-style objects, and anything left out keeps the default:
+package reads, and mosaickit parses it for all of them. The top level holds what every package
+shares: `base` (the built-in theme to start from), `[font]`, `[fonts]` and the `background`,
+`axis` and `label` colours in `[color]`. utility-viz keeps its own settings under `[utility]`;
+other packages keep theirs in their own table (for example `[principle.color]`), which
+utility-viz skips. Table names match Theme properties (`[utility.stroke.budget]` is
+`theme.budget_stroke`), fields match the style objects, and anything left out keeps the default:
 
 ```toml
+base = "default"
+
+[font]
+text = "serif"
+
 [color]
+axis = "#1a1a1a"
+
+[utility.color]
 ic = "#2E86AB"
 
-[stroke.budget]
+[utility.stroke.budget]
 width = 1.5
 
-[label.point]
+[utility.label.point]
 fontsize = 12
 
-[legend]
+[utility.legend]
 position = "bottom"
 ```
 
@@ -278,7 +287,14 @@ Config.load("econ-viz.toml").use()  # diagrams created from now on use it
 
 `utility-viz init` writes a commented template, and `utility-viz plot --config
 econ-viz.toml ...` uses the same file. Arguments passed to a method still win
-over the file.
+over the file. A mistake names the file, the table and, when the name is close,
+what you probably meant (`[utility.stroke] no such setting; did you mean 'budget'?`).
+`mosaickit.econ_toml.use()` loads the file for every installed EconViz package at once.
+
+Files from 2.0.0b7 and earlier keep utility-viz's tables at the top level (`[color] ic`,
+`[stroke.budget]`, `[legend]`, ...). They are still read, with one deprecation warning per load;
+a key under `[utility]` wins over the same key at the top level. `utility-viz init --migrate`
+moves them under `[utility]` and keeps your comments.
 
 ## CLI
 
@@ -308,6 +324,7 @@ utility-viz plot --model cobb-douglas --alpha 0.5 --beta 0.5 \
 | Import | `import econ_viz` | `import utility_viz` |
 | CLI | `econ-viz` | `utility-viz` |
 | Config file | `econ-viz.toml` | `econ-viz.toml`, shared by every EconViz package (2.0 betas through b6 used `utility-viz.toml`) |
+| Config layout | `[color]`, `[stroke.*]`, `[legend]`, ... at the top level | utility-viz's tables under `[utility]` (`[utility.stroke.*]`, ...) since 2.0.0b8; shared `base`, `[font]`, `[fonts]`, `[color] background/axis/label` stay at the top level |
 
 **Which package to install.** `utility-viz` ships only `utility_viz` and the `utility-viz` command: it has no
 `econ_viz` package and no `econ-viz` command. `econ-viz` 2.x (same version number) is a thin compatibility
@@ -335,10 +352,14 @@ to drop the compatibility layer.
   `Config.discover()` falls back to defaults; `Config.load("file.toml")` reads exactly that file.
   `utility-viz plot` applies the same lookup in the current directory when `--config` is not given.
 - The `econ-viz` command prints a deprecation warning and forwards to `utility-viz`.
-- `utility-viz init --migrate` writes `econ-viz.toml` from `utility-viz.toml` and keeps the old file.
+- Config layout: utility-viz's tables at the top level (`[color] ic`, `[stroke.*]`, `[marker.*]`, `[label.*]`,
+  `[fill.*]`, `[legend]`) are read as if they were under `[utility]`, with one
+  `UtilityVizDeprecationWarning` per load naming the new tables. A key under `[utility]` wins.
+- `utility-viz init --migrate` rewrites `utility-viz.toml` into `econ-viz.toml` (the old file is kept), or a
+  legacy-layout `econ-viz.toml` in place, moving utility-viz's tables under `[utility]` and keeping comments.
 
-**Removal boundary (3.0.0).** The `econ_viz` package, the `econ-viz` command and `utility-viz.toml` lookup are
-removed in 3.0.0, not 2.0.0. Only the documented 1.x public API is covered; undocumented deep module paths
+**Removal boundary (3.0.0).** The `econ_viz` package, the `econ-viz` command, `utility-viz.toml` lookup and the
+top-level utility-viz tables in `econ-viz.toml` are removed in 3.0.0, not 2.0.0. Only the documented 1.x public API is covered; undocumented deep module paths
 (for example `econ_viz.canvas.renderers.*`) resolve on a best-effort basis and may disappear at any time.
 Internal `utility_viz.core.*` modules are advanced APIs and not part of the compatibility contract.
 

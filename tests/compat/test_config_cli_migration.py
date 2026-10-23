@@ -17,7 +17,7 @@ from utility_viz.core.errors.exceptions import InvalidParameterError
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
-NEW_TOML = 'base = "nord"\n[color]\nic = "#111111"\n'
+NEW_TOML = 'base = "nord"\n[utility.color]\nic = "#111111"\n'
 OLD_TOML = 'base = "dark"\n[color]\nic = "#222222"\n'
 
 
@@ -129,7 +129,7 @@ def test_load_with_explicit_path_is_unchanged(tmp_path):
 
 
 def test_section_names_unchanged_between_files(tmp_path):
-    text = '[font]\ntext = "serif"\n[stroke.budget]\nwidth = 2\n'
+    text = '[font]\ntext = "serif"\n[utility.stroke.budget]\nwidth = 2\n'
     old = Config.load(_write(tmp_path, LEGACY_FILE, text))
     new = Config.load(_write(tmp_path, DEFAULT_FILE, text))
     assert _same(old, new)
@@ -152,9 +152,13 @@ def test_init_migrate_writes_new_and_keeps_old(tmp_path, monkeypatch, capsys):
     assert legacy.read_text(encoding="utf-8") == OLD_TOML  # old file kept untouched
     assert target.exists()
     migrated = target.read_text(encoding="utf-8")
-    assert migrated.endswith(OLD_TOML)  # sections/contents preserved verbatim
+    assert migrated.endswith('base = "dark"\n[utility.color]\nic = "#222222"\n')  # utility keys moved
     assert "Migrated from utility-viz.toml" in migrated
-    assert _same(Config.load(target), Config.load(legacy))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # the migrated file uses the new layout
+        new = Config.load(target)
+    with pytest.warns(UtilityVizDeprecationWarning):
+        assert _same(new, Config.load(legacy))
     assert "kept" in capsys.readouterr().out
     # After migrating, the new file wins; the leftover legacy file warns as ignored.
     with pytest.warns(UtilityVizDeprecationWarning, match="ignored"):
@@ -176,7 +180,106 @@ def test_init_migrate_refuses_to_overwrite_without_force(tmp_path, monkeypatch):
         _run_cli(monkeypatch, "init", str(tmp_path / DEFAULT_FILE), "--migrate")
     assert (tmp_path / DEFAULT_FILE).read_text(encoding="utf-8") == NEW_TOML
     _run_cli(monkeypatch, "init", str(tmp_path / DEFAULT_FILE), "--migrate", "--force")
-    assert (tmp_path / DEFAULT_FILE).read_text(encoding="utf-8").endswith(OLD_TOML)
+    assert (tmp_path / DEFAULT_FILE).read_text(encoding="utf-8").endswith('[utility.color]\nic = "#222222"\n')
+
+
+LEGACY_LAYOUT = """\
+# my settings
+base = "nord"
+
+[font]
+text = "serif"
+
+[color]
+# the indifference curves
+ic = "#123456"  # blue-ish
+background = "#ffffff"
+budget = "#654321"
+
+# strokes below
+[stroke.ic]
+width = 2.6
+
+[legend]
+position = "bottom"
+"""
+
+MIGRATED_LAYOUT = """\
+# Migrated from econ-viz.toml by `utility-viz init --migrate`: utility-viz's settings now live under [utility].
+# my settings
+base = "nord"
+
+[font]
+text = "serif"
+
+[color]
+background = "#ffffff"
+
+[utility.color]
+# the indifference curves
+ic = "#123456"  # blue-ish
+budget = "#654321"
+
+# strokes below
+[utility.stroke.ic]
+width = 2.6
+
+[utility.legend]
+position = "bottom"
+"""
+
+
+def test_init_migrate_rewrites_a_legacy_econ_viz_toml_in_place(tmp_path, monkeypatch, capsys):
+    target = _write(tmp_path, DEFAULT_FILE, LEGACY_LAYOUT)
+    with pytest.warns(UtilityVizDeprecationWarning):
+        before = Config.load(target)
+    _run_cli(monkeypatch, "init", str(target), "--migrate")
+    assert target.read_text(encoding="utf-8") == MIGRATED_LAYOUT  # comments kept, keys moved
+    out = capsys.readouterr().out
+    assert "[stroke.ic] -> [utility.stroke.ic]" in out and "[color] ic -> [utility.color] ic" in out
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        after = Config.load(target)
+    assert _same(before, after)
+    # A second run has nothing left to move and leaves the file alone.
+    _run_cli(monkeypatch, "init", str(target), "--migrate")
+    assert "nothing to migrate" in capsys.readouterr().out
+    assert target.read_text(encoding="utf-8") == MIGRATED_LAYOUT
+
+
+def test_init_migrate_merges_into_an_existing_utility_colour_table(tmp_path, monkeypatch):
+    target = _write(
+        tmp_path, DEFAULT_FILE, '[utility.color]\nic = "#111111"\n\n[color]\naxis = "#222222"\nray = "#333333"\n'
+    )
+    _run_cli(monkeypatch, "init", str(target), "--migrate")
+    text = target.read_text(encoding="utf-8")
+    assert text.count("[utility.color]") == 1
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        theme = Config.load(target).theme
+    assert (theme.ic_color, theme.ray_color, theme.axis_color) == ("#111111", "#333333", "#222222")
+
+
+def test_init_migrate_moves_dotted_top_level_keys(tmp_path, monkeypatch):
+    target = _write(tmp_path, DEFAULT_FILE, 'color.ic = "#111111"\ncolor.axis = "#222222"\nstroke.ic.width = 3\n')
+    _run_cli(monkeypatch, "init", str(target), "--migrate")
+    assert target.read_text(encoding="utf-8").endswith(
+        'utility.color.ic = "#111111"\ncolor.axis = "#222222"\nutility.stroke.ic.width = 3\n'
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        theme = Config.load(target).theme
+    assert (theme.ic_color, theme.axis_color, theme.ic_stroke.width) == ("#111111", "#222222", 3)
+
+
+def test_init_migrate_refuses_a_result_that_is_not_valid_toml(tmp_path, monkeypatch, capsys):
+    text = "[stroke.ic]\nwidth = 2\n[utility.stroke.ic]\nwidth = 3\n"  # both names for one table
+    target = _write(tmp_path, DEFAULT_FILE, text)
+    with pytest.raises(SystemExit):
+        _run_cli(monkeypatch, "init", str(target), "--migrate")
+    assert "could not migrate automatically" in capsys.readouterr().err
+    assert target.read_text(encoding="utf-8") == text
+    assert not list(tmp_path.glob("*.migrating"))
 
 
 def test_init_migrate_rejects_invalid_toml(tmp_path, monkeypatch, capsys):
