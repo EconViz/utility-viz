@@ -40,7 +40,7 @@ from utility_viz.core.config.fonts import _OLD_MATH_TOKENS
 from utility_viz.core.errors.deprecation import UtilityVizDeprecationWarning, deprecation_message, warn_deprecated
 from utility_viz.core.errors.exceptions import InvalidParameterError
 from utility_viz.core.styles.fill import Fill
-from utility_viz.core.styles.label import Label
+from utility_viz.core.styles.label import NUDGES, Label
 from utility_viz.core.styles.legend import Legend
 from utility_viz.core.styles.marker import Marker
 from utility_viz.core.styles.stroke import Stroke
@@ -62,6 +62,7 @@ _STYLES: dict[str, tuple[type, str]] = {
 _ALIASES = {"equilibrium": "eq", "substitution_effect": "sub_effect", "income_effect": "inc_effect"}
 _LEGEND_FIELDS = tuple(f.name for f in dataclasses.fields(Legend))
 _OVERRIDES = "_ev_overrides"
+_LENGTH = et.length("")
 
 
 @dataclass(frozen=True)
@@ -269,6 +270,8 @@ def _style_pattern(section: str) -> et.Pattern:
             raise ConfigurationError(f"unknown key {key!r}{_hint(key, allowed)} (fields: {', '.join(allowed)})")
         if "color" in table:
             check_color(table["color"], ctx, "color")
+        if style is Label:  # nudges: a length in points (pt, mm, cm, in; no em in the file)
+            table = {key: _LENGTH.convert(value, ctx, key) if key in NUDGES else value for key, value in table.items()}
         try:
             return {f"styles.{prop}": style(**table)}
         except (InvalidParameterError, TypeError, ValueError) as error:

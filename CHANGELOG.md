@@ -42,6 +42,13 @@
 - There is no dark theme any more. `themes.dark`, `base = "dark"` and `--theme dark` emit a
   `UtilityVizDeprecationWarning` and use `default` throughout 2.x (an error in 3.0). Set
   `[color] background` for an opaque backdrop when exporting SVG or PNG.
+- Label nudges: `Label(top=..., bottom=..., left=..., right=...)` moves one placed label by a
+  length, a number of points or a string such as `"10pt"`, `"0.5em"` (the label's font size) or
+  `"2mm"`, for example `cvs.add_equilibrium(eq, label=Label(top="10pt"))` or
+  `cvs.add_point(5, 3, label=Label(text="A", left="6pt"))`. The label is placed as before and then
+  moved (a mosaickit `Nudge`), so later labels still avoid it. `[utility.label.<name>] top = "2pt"`
+  sets a default for every label of that kind (pt, mm, cm or in; no em in the file); a label's own
+  value replaces it for that direction. Without nudges every figure is unchanged.
 
 ## v2.0.0b7 (2026-10-23)
 

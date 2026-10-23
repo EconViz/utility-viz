@@ -16,7 +16,7 @@ from utility_viz.core.config.fonts import resolve_font, resolve_fonts, resolve_m
 from utility_viz.core.config.settings import Config
 from utility_viz.core.constants.canvas import DEFAULT_DPI, MAX_DPI, MIN_DPI
 from utility_viz.core.errors.exceptions import InvalidParameterError
-from utility_viz.core.scenes.styles import to_mosaic_stroke, to_mosaic_text, to_mosaic_theme
+from utility_viz.core.scenes.styles import to_mosaic_nudge, to_mosaic_stroke, to_mosaic_text, to_mosaic_theme
 from utility_viz.core.styles.axis import Axis
 from utility_viz.core.styles.label import Label, split_label
 from utility_viz.core.styles.stroke import Stroke
@@ -170,6 +170,7 @@ class Canvas(LayerMixin, MosaicCanvas):
                     offset=x_offset,
                     anchor=x_anchor,
                     math=_axis_label_is_math(self.x_label),
+                    nudge=to_mosaic_nudge(self.x_label_style),
                 )
             )
         if self.y_label_style.visible is not False:
@@ -183,6 +184,7 @@ class Canvas(LayerMixin, MosaicCanvas):
                     offset=y_offset,
                     anchor=y_anchor,
                     math=_axis_label_is_math(self.y_label),
+                    nudge=to_mosaic_nudge(self.y_label_style),
                 )
             )
         if self.origin_style.visible is not False:
@@ -195,6 +197,7 @@ class Canvas(LayerMixin, MosaicCanvas):
                     style=to_mosaic_text(self.origin_style, font=self.font),
                     offset=(-4, -4),
                     anchor="top-right",
+                    nudge=to_mosaic_nudge(self.origin_style),
                 )
             )
         if self.title and self.title_style.visible is not False:
@@ -208,6 +211,7 @@ class Canvas(LayerMixin, MosaicCanvas):
                     offset=(0, 12),
                     anchor="bottom",
                     z_index=10,
+                    nudge=to_mosaic_nudge(self.title_style),
                 )
             )
         return tuple(layers)

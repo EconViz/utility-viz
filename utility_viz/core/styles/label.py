@@ -4,11 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+from mosaickit import ConfigurationError
+from mosaickit.styles.nudge import parse_length
+
 from utility_viz.core.errors.exceptions import InvalidParameterError
 from utility_viz.core.styles.opacity import check_opacity
 from utility_viz.enums import LabelPosition
 
 _ALIASES = {"above": "top", "below": "bottom"}
+NUDGES = ("top", "bottom", "left", "right")
 
 
 def to_position(value, *, what: str) -> LabelPosition:
@@ -42,6 +46,17 @@ class Label:
         ``False`` hides the label.
     opacity : float, optional
         From 0 (transparent) to 1 (opaque).
+    top, bottom, left, right : float or str, optional
+        Move the placed label up, down, left or right by a length: a number of points or a
+        string such as ``"10pt"``, ``"0.5em"`` (em is the label's font size) or ``"2mm"``.
+        The label is still placed as usual (by *position* and *offset*); the move is applied
+        afterwards. ``top`` and ``bottom`` combine (``top - bottom``), as do ``right`` and
+        ``left``; negative lengths move the other way.
+
+    Examples
+    --------
+    >>> cvs.add_equilibrium(eq, label=Label(top="10pt"))  # doctest: +SKIP
+    >>> cvs.add_point(5, 3, label=Label(text="A", left="6pt"))  # doctest: +SKIP
     """
 
     text: str | None = None
@@ -51,9 +66,15 @@ class Label:
     fontsize: float | None = None
     visible: bool | None = None
     opacity: float | None = None
+    top: float | str | None = None
+    bottom: float | str | None = None
+    left: float | str | None = None
+    right: float | str | None = None
 
     def __post_init__(self) -> None:
         check_opacity("Label", self.opacity)
+        for name in NUDGES:
+            check_length(f"Label {name}", getattr(self, name))
         if self.position is not None:
             object.__setattr__(self, "position", to_position(self.position, what="Label position"))
         if self.fontsize is not None and not self.fontsize > 0:
@@ -63,13 +84,23 @@ class Label:
         """Return this label with unset fields taken from *base*."""
         if base is None:
             return self
-        fields = ("text", "position", "offset", "color", "fontsize", "visible", "opacity")
+        fields = ("text", "position", "offset", "color", "fontsize", "visible", "opacity", *NUDGES)
         return Label(
             **{
                 field: getattr(self, field) if getattr(self, field) is not None else getattr(base, field)
                 for field in fields
             }
         )
+
+
+def check_length(owner: str, value) -> None:
+    """Raise :class:`InvalidParameterError` unless *value* is ``None`` or a length (pt, em, mm, ...)."""
+    if value is None:
+        return
+    try:
+        parse_length(value, font_size=1.0)  # em is checked against a font size only when drawn
+    except ConfigurationError as error:
+        raise InvalidParameterError(f"{owner}: {error}") from None
 
 
 def as_label(value) -> Label | None:

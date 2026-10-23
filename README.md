@@ -140,6 +140,18 @@ canvas.add_utility(u, levels=3, ic_label=Label(text="U={:.1f}", position="top"))
 canvas.add_decomposition(dec, point_label=Label(visible=False))  # hide A, B, C
 ```
 
+To fine-tune where one label ends up, nudge it with `top`, `bottom`, `left` or `right`. The
+label is placed as usual and then moved by that length: a number of points or a string such as
+`"10pt"`, `"0.5em"` (em is the label's font size) or `"2mm"`:
+
+```python
+canvas.add_equilibrium(eq, label=Label(top="10pt"))  # 10 pt higher
+canvas.add_point(5, 3, label=Label(text="A", left="6pt"))  # 6 pt to the left
+```
+
+In `econ-viz.toml`, `[utility.label.point]` with `top = "2pt"` nudges every point label; a
+label's own `top` replaces it.
+
 The same `Label` styles every other piece of text: axis labels, the origin
 `0`, titles, effect labels, and the Edgeworth box's good names and origins:
 

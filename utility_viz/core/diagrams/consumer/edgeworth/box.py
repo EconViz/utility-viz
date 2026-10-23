@@ -12,7 +12,7 @@ from utility_viz.core.config.settings import Config
 from utility_viz.core.constants.canvas import DEFAULT_DPI, MAX_DPI, MIN_DPI
 from utility_viz.core.diagrams.consumer.edgeworth.methods import IndifferenceMixin
 from utility_viz.core.scenes.consumer.edgeworth import edgeworth_frame_layers
-from utility_viz.core.scenes.styles import to_mosaic_stroke, to_mosaic_text, to_mosaic_theme
+from utility_viz.core.scenes.styles import nudged, to_mosaic_nudge, to_mosaic_stroke, to_mosaic_text, to_mosaic_theme
 from utility_viz.core.styles.axis import Axis
 from utility_viz.core.styles.label import Label
 from utility_viz.core.styles.legend import Legend
@@ -71,17 +71,21 @@ class EdgeworthBox(IndifferenceMixin, MosaicCanvas):
             ),
             theme=to_mosaic_theme(selected_theme),
         )
+        frame = edgeworth_frame_layers(
+            self.total_x,
+            self.total_y,
+            x_label=self.x_label,
+            y_label=self.y_label,
+            x_stroke=to_mosaic_stroke(self.x_side_stroke),
+            y_stroke=to_mosaic_stroke(self.y_side_stroke),
+            label_style=to_mosaic_text(self.x_label_style),
+            origin_style=to_mosaic_text(self.origin_style),
+        )
         self.extend(
-            edgeworth_frame_layers(
-                self.total_x,
-                self.total_y,
-                x_label=self.x_label,
-                y_label=self.y_label,
-                x_stroke=to_mosaic_stroke(self.x_side_stroke),
-                y_stroke=to_mosaic_stroke(self.y_side_stroke),
-                label_style=to_mosaic_text(self.x_label_style),
-                origin_style=to_mosaic_text(self.origin_style),
-            )
+            nudged(layer, self.origin_style if layer.id.startswith("box.origin") else self.x_label_style)
+            if isinstance(layer, TextLayer)
+            else layer
+            for layer in frame
         )
         if self.title and self.title_style.visible is not False:
             self.add(
@@ -94,6 +98,7 @@ class EdgeworthBox(IndifferenceMixin, MosaicCanvas):
                     id="box.title",
                     role="title",
                     z_index=10,
+                    nudge=to_mosaic_nudge(self.title_style),
                 )
             )
 
