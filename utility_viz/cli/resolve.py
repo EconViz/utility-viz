@@ -47,8 +47,13 @@ def _themes_map() -> dict[str, object]:
         import utility_viz.core.themes as themes
 
         _THEMES = {name: themes.build_theme(name) for name in themes.THEME_NAMES}
-        _THEMES["dark"] = themes.dark
     return _THEMES
+
+
+def _removed_themes() -> dict[str, str]:
+    import utility_viz.core.themes as themes
+
+    return themes.REMOVED_THEMES
 
 
 def resolve_theme(name: str):
@@ -65,7 +70,12 @@ def resolve_theme(name: str):
         The matching theme instance.
     """
     mapping = _themes_map()
-    theme = mapping.get(name.lower())
+    key = name.lower()
+    if key in _removed_themes():
+        import utility_viz.core.themes as themes
+
+        return getattr(themes, key)  # warns and gives the replacement
+    theme = mapping.get(key)
     if theme is None:
         available = ", ".join(mapping)
         raise CliConfigError(f"unknown theme '{name}'. Available: {available}")

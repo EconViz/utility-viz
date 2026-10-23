@@ -39,6 +39,9 @@
   x1.25), so its lines, points and labels are slightly different from 2.0.0b7.
 - `Theme` gains `kink_markersize` and `bliss_markersize`. `utility-viz plot --theme` accepts every
   built-in theme, including `colorblind` and `manual`.
+- There is no dark theme any more. `themes.dark`, `base = "dark"` and `--theme dark` emit a
+  `UtilityVizDeprecationWarning` and use `default` throughout 2.x (an error in 3.0). Set
+  `[color] background` for an opaque backdrop when exporting SVG or PNG.
 
 ## v2.0.0b7 (2026-10-23)
 

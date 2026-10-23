@@ -4,14 +4,15 @@ import pytest
 
 from utility_viz import Canvas, Config, themes
 from utility_viz.cli.resolve import resolve_theme
+from utility_viz.core.errors.deprecation import UtilityVizDeprecationWarning
 
 
-@pytest.mark.parametrize("name", ["default", "colorblind", "nord", "paper", "monochrome", "presentation", "dark"])
+@pytest.mark.parametrize("name", ["manual", "default", "colorblind", "nord", "paper", "monochrome", "presentation"])
 def test_themes_are_registered(name):
     assert getattr(themes, name).name == name
 
 
-@pytest.mark.parametrize("name", ["paper", "monochrome", "presentation", "dark"])
+@pytest.mark.parametrize("name", ["manual", "colorblind", "paper", "monochrome", "presentation"])
 def test_theme_resolves_from_cli_and_config(name):
     assert resolve_theme(name).name == name
     assert Config.from_dict({"base": name}).theme.name == name
@@ -46,15 +47,42 @@ def test_presentation_tokens_are_larger():
     assert themes.presentation.title_label.fontsize > 12
 
 
-def test_dark_and_transparent_backgrounds_compile_to_canvas_role():
-    dark = Canvas(theme=themes.dark).theme.roles["canvas"].fill
+def test_opaque_and_transparent_backgrounds_compile_to_canvas_role():
+    opaque = Canvas(theme=themes.manual).theme.roles["canvas"].fill
     transparent = Canvas(theme=themes.default).theme.roles["canvas"].fill
-    assert dark.color.to_hex().lower() == themes.dark.background_color.lower()
-    assert dark.opacity == 1.0
+    assert opaque.color.to_hex().lower() == "#ffffff"
+    assert opaque.opacity == 1.0
     assert transparent.opacity == 0.0
 
 
-def test_dark_canvas_saves_png(tmp_path):
-    target = tmp_path / "dark.png"
-    Canvas(theme=themes.dark).add_budget(1, 1, 8).save(target)
+def test_manual_canvas_saves_png(tmp_path):
+    target = tmp_path / "manual.png"
+    Canvas(theme=themes.manual).add_budget(1, 1, 8).save(target)
     assert target.read_bytes().startswith(b"\x89PNG")
+
+
+def test_dark_theme_is_removed_and_gives_default():
+    with pytest.warns(UtilityVizDeprecationWarning, match="'dark' theme"):
+        theme = themes.dark
+    assert theme is themes.default
+    assert "dark" not in themes.__all__
+    with pytest.raises(AttributeError):
+        themes.light  # noqa: B018
+
+
+def test_dark_base_warns_and_uses_default():
+    with pytest.warns(UtilityVizDeprecationWarning, match='base = "dark"'):
+        config = Config.from_dict({"base": "dark"})
+    assert config.theme is themes.default
+
+
+def test_dark_cli_theme_warns_and_uses_default():
+    with pytest.warns(UtilityVizDeprecationWarning):
+        assert resolve_theme("dark") is themes.default
+
+
+def test_dark_is_not_offered():
+    from utility_viz.core.config.settings import template
+
+    base = next(line for line in template().splitlines() if line.startswith("base ="))
+    assert "manual" in base and "dark" not in base

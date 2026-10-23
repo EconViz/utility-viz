@@ -18,7 +18,7 @@ from utility_viz.core.errors.exceptions import InvalidParameterError
 ROOT = Path(__file__).resolve().parent.parent.parent
 
 NEW_TOML = 'base = "nord"\n[utility.color]\nic = "#111111"\n'
-OLD_TOML = 'base = "dark"\n[color]\nic = "#222222"\n'
+OLD_TOML = 'base = "nord"\n[color]\nic = "#222222"\n'
 
 
 # --- deprecation warning type ------------------------------------------------------------------------
@@ -152,7 +152,7 @@ def test_init_migrate_writes_new_and_keeps_old(tmp_path, monkeypatch, capsys):
     assert legacy.read_text(encoding="utf-8") == OLD_TOML  # old file kept untouched
     assert target.exists()
     migrated = target.read_text(encoding="utf-8")
-    assert migrated.endswith('base = "dark"\n[utility.color]\nic = "#222222"\n')  # utility keys moved
+    assert migrated.endswith('base = "nord"\n[utility.color]\nic = "#222222"\n')  # utility keys moved
     assert "Migrated from utility-viz.toml" in migrated
     with warnings.catch_warnings():
         warnings.simplefilter("error")  # the migrated file uses the new layout

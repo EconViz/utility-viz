@@ -28,8 +28,8 @@ class Theme:
         Colour for axis labels and the origin marker.
     background_color : str, optional
         Figure/axes background. ``None`` keeps the fully transparent default
-        (the previous, only, behaviour); set it for themes meant to be
-        viewed against a fixed backdrop, such as a dark theme.
+        (the previous, only, behaviour); set it for figures exported to SVG or
+        PNG that need an opaque backdrop, as the ``manual`` theme does.
     label_scale : float
         Multiplier applied to the font size of every :class:`Label` property
         below that has one (``title_label`` and ``box_label`` follow

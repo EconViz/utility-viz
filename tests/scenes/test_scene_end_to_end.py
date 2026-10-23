@@ -83,10 +83,12 @@ def test_tikz_exports_legend_text_and_generic_font(tmp_path):
 
 
 def test_tikz_exports_canvas_background():
+    from dataclasses import replace
+
     from utility_viz import Canvas as UtilityCanvas
     from utility_viz import themes
 
-    source = canvas_to_tikz(UtilityCanvas(theme=themes.dark))
+    source = canvas_to_tikz(UtilityCanvas(theme=replace(themes.default, background_color="#1E1E1E")))
     assert r"\path[fill=" in source
     assert "1E1E1E" in source
 

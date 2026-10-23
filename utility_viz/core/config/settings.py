@@ -37,7 +37,7 @@ from mosaickit import econ_toml as et
 
 import utility_viz.core.themes as themes
 from utility_viz.core.config.fonts import _OLD_MATH_TOKENS
-from utility_viz.core.errors.deprecation import UtilityVizDeprecationWarning, warn_deprecated
+from utility_viz.core.errors.deprecation import UtilityVizDeprecationWarning, deprecation_message, warn_deprecated
 from utility_viz.core.errors.exceptions import InvalidParameterError
 from utility_viz.core.styles.fill import Fill
 from utility_viz.core.styles.label import Label
@@ -316,19 +316,30 @@ def _finalize(draft: _Draft, ctx: et.Context) -> Config:
 
 def _warn_legacy_layout(message: str) -> None:
     """The legacy-layout warning, blamed on the first caller outside utility-viz and mosaickit."""
+    _warn_outside(f"{message} (run `utility-viz init --migrate` to rewrite the file)")
+
+
+def _warn_outside(message: str) -> None:
+    """A UtilityVizDeprecationWarning blamed on the first caller outside utility-viz and mosaickit."""
     internal = (str(Path(__file__).resolve().parents[2]), str(Path(mosaickit.__file__).resolve().parent))
     level, frame = 1, sys._getframe(0)
     while frame is not None and frame.f_code.co_filename.startswith(internal):
         frame, level = frame.f_back, level + 1  # type: ignore[assignment]
-    warnings.warn(
-        f"{message} (run `utility-viz init --migrate` to rewrite the file)",
-        UtilityVizDeprecationWarning,
-        stacklevel=level,
-    )
+    warnings.warn(message, UtilityVizDeprecationWarning, stacklevel=level)
 
 
 def _base(name: str) -> Callable[[], _Draft]:
     """The factory of base *name*; the built-in themes come from the theme roles."""
+    if name in themes.REMOVED_THEMES:
+        replacement = themes.REMOVED_THEMES[name]
+
+        def removed() -> _Draft:
+            _warn_outside(
+                deprecation_message(f'base = "{name}"', f'base = "{replacement}" (there is no dark theme)'),
+            )
+            return _Draft(theme=roles.build_theme(replacement))
+
+        return removed
     if name in roles.THEME_NAMES:
         return lambda: _Draft(theme=roles.build_theme(name))
     return lambda: _Draft(theme=getattr(themes, name))
@@ -364,7 +375,7 @@ def _docs() -> dict[str, str]:
 SCHEMA = et.register(
     et.Schema(
         package="utility",
-        base={name: _base(name) for name in _builtin_theme_names()},
+        base={name: _base(name) for name in [*_builtin_theme_names(), *themes.REMOVED_THEMES]},
         fields=_fields(),
         patterns={section: _style_pattern(section) for section in _STYLES},
         shared={
