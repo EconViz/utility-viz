@@ -284,9 +284,7 @@ def _legend_field(key: str) -> et.Field:
         except (InvalidParameterError, TypeError, ValueError) as error:
             raise ctx.error(str(error)) from None
 
-    value = getattr(themes.default.legend, key)
-    placeholder = getattr(value, "value", value)
-    return dataclasses.replace(et.transform(f"styles.legend.{key}", convert), placeholder=placeholder)
+    return et.transform(f"styles.legend.{key}", convert)
 
 
 def _math_font(value: Any, ctx: et.Context) -> MathFont:
