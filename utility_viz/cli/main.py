@@ -138,13 +138,13 @@ def _register_plot(sub) -> argparse.ArgumentParser:
 
 def _register_init(sub) -> argparse.ArgumentParser:
     """Add the ``init`` sub-command to *sub* and return its parser."""
-    p = sub.add_parser("init", help="Write a commented utility-viz.toml settings template.")
-    p.add_argument("path", nargs="?", default="utility-viz.toml", help="File to write (default: utility-viz.toml).")
+    p = sub.add_parser("init", help="Write a commented econ-viz.toml settings template.")
+    p.add_argument("path", nargs="?", default="econ-viz.toml", help="File to write (default: econ-viz.toml).")
     p.add_argument("--force", action="store_true", help="Overwrite an existing file.")
     p.add_argument(
         "--migrate",
         action="store_true",
-        help="Create utility-viz.toml from the legacy econ-viz.toml in the same directory (the old file is kept).",
+        help="Create econ-viz.toml from utility-viz.toml in the same directory (the old file is kept).",
     )
     return p
 

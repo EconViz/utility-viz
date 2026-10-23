@@ -2,6 +2,18 @@
 
 <!-- version list -->
 
+## v2.0.0b7 (2026-10-23)
+
+### Changes
+
+- `econ-viz.toml` is the settings file again, now shared by every EconViz package: `Config.load()`,
+  `Config.discover()`, `utility-viz plot` and `utility-viz init` look for it first. `utility-viz.toml`,
+  the 2.0 beta name, is still read with a deprecation warning; `utility-viz init --migrate` copies it
+  to `econ-viz.toml`. Section names are unchanged.
+- Tables that belong to other packages (`[principle]`, `[micro]`, `[macro]`, `[trade]`, `[dsge]`,
+  `[game]`) are skipped instead of rejected, so one file styles every package.
+- Requires `mosaickit>=1.0.0rc5`.
+
 ## v2.0.0b6 (2026-10-22)
 
 ### Fixes

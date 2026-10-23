@@ -33,7 +33,7 @@ def cmd_plot(args: argparse.Namespace) -> None:
     if not config_path:
         from utility_viz.core.config.settings import find_config_file
 
-        found = find_config_file()  # utility-viz.toml, then legacy econ-viz.toml (warns), else None
+        found = find_config_file()  # econ-viz.toml, then legacy utility-viz.toml (warns), else None
         config_path = str(found) if found is not None else None
     if config_path:
         config = _load_config(config_path, args.theme)

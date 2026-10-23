@@ -64,7 +64,7 @@ def reset_config():
 
 @pytest.fixture
 def example(tmp_path):
-    path = tmp_path / "utility-viz.toml"
+    path = tmp_path / "econ-viz.toml"
     path.write_text(EXAMPLE, encoding="utf-8")
     return path
 
@@ -188,7 +188,7 @@ class TestUse:
 
 class TestTemplate:
     def test_template_loads_and_changes_nothing(self, tmp_path):
-        path = tmp_path / "utility-viz.toml"
+        path = tmp_path / "econ-viz.toml"
         path.write_text(template(), encoding="utf-8")
         t = Config.load(path).theme
         for name in ("budget_stroke", "eq_marker", "point_label", "budget_fill", "legend"):
@@ -207,7 +207,7 @@ class TestCli:
         main()
 
     def test_init_writes_and_refuses_to_overwrite(self, tmp_path, monkeypatch, capsys):
-        path = tmp_path / "utility-viz.toml"
+        path = tmp_path / "econ-viz.toml"
         self._run(monkeypatch, "init", str(path))
         assert path.read_text(encoding="utf-8") == template()
         with pytest.raises(SystemExit):
@@ -261,7 +261,7 @@ class TestFontPaths:
         (tmp_path / "fonts").mkdir()
         (tmp_path / "fonts" / "serif.ttf").write_bytes((FONT_DIR / "DejaVuSerif.ttf").read_bytes())
         (tmp_path / "fonts" / "math.ttf").write_bytes(MATH_FILE.read_bytes())
-        path = tmp_path / "utility-viz.toml"
+        path = tmp_path / "econ-viz.toml"
         path.write_text('[font]\nmath = "fonts/math.ttf"\n[fonts]\nserif = "fonts/serif.ttf"\n', encoding="utf-8")
         config = Config.load(path)
         assert config.fonts == TextFonts(serif=tmp_path / "fonts" / "serif.ttf")
@@ -270,3 +270,17 @@ class TestFontPaths:
     def test_the_template_documents_the_generic_fonts(self):
         text = template()
         assert 'text = "serif"' in text and "[fonts]" in text and "math = " in text
+
+
+def test_other_packages_tables_are_skipped(tmp_path):
+    from utility_viz.core.config.settings import Config
+
+    path = tmp_path / "econ-viz.toml"
+    path.write_text(
+        '[color]\nic = "#123456"\n[principle.color]\ndemand = "#8c8c8c"\n[macro]\nx = 1\n',
+        encoding="utf-8",
+    )
+
+    config = Config.load(path)
+
+    assert config.theme.ic_color == "#123456"

@@ -94,7 +94,7 @@ def test_legacy_file_is_used_with_warning(tmp_path):
         config = Config.discover(directory=tmp_path)
     assert config.theme.ic_color == "#222222"
     text = str(caught[0].message)
-    assert "econ-viz.toml" in text and "utility-viz.toml" in text
+    assert "utility-viz.toml" in text and "econ-viz.toml" in text
     assert "deprecated since 2.0.0" in text and "removed in 3.0.0" in text
     assert "init --migrate" in text
     assert caught[0].filename == __file__
@@ -106,12 +106,12 @@ def test_new_wins_when_both_exist_and_legacy_is_ignored_with_warning(tmp_path):
     with pytest.warns(UtilityVizDeprecationWarning, match="ignored") as caught:
         config = Config.discover(directory=tmp_path)
     assert config.theme.ic_color == "#111111"
-    assert "econ-viz.toml" in str(caught[0].message)
+    assert "utility-viz.toml" in str(caught[0].message)
 
 
 def test_load_without_path_uses_lookup_in_cwd(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    with pytest.raises(InvalidParameterError, match="config file not found: utility-viz.toml"):
+    with pytest.raises(InvalidParameterError, match="config file not found: econ-viz.toml"):
         Config.load()  # 1.x semantics: no file is an error ...
     assert Config.discover() == Config()  # ... discover() falls back to defaults
     _write(tmp_path, LEGACY_FILE, OLD_TOML)
@@ -153,7 +153,7 @@ def test_init_migrate_writes_new_and_keeps_old(tmp_path, monkeypatch, capsys):
     assert target.exists()
     migrated = target.read_text(encoding="utf-8")
     assert migrated.endswith(OLD_TOML)  # sections/contents preserved verbatim
-    assert "Migrated from econ-viz.toml" in migrated
+    assert "Migrated from utility-viz.toml" in migrated
     assert _same(Config.load(target), Config.load(legacy))
     assert "kept" in capsys.readouterr().out
     # After migrating, the new file wins; the leftover legacy file warns as ignored.
@@ -190,8 +190,8 @@ def test_init_migrate_rejects_invalid_toml(tmp_path, monkeypatch, capsys):
 def test_plain_init_writes_new_default_name(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     _run_cli(monkeypatch, "init")
-    assert (tmp_path / "utility-viz.toml").exists()
-    assert not (tmp_path / "econ-viz.toml").exists()
+    assert (tmp_path / "econ-viz.toml").exists()
+    assert not (tmp_path / "utility-viz.toml").exists()
 
 
 def test_utility_viz_cli_prog_and_version(monkeypatch, capsys):
@@ -331,7 +331,7 @@ def test_plot_picks_up_new_file_from_cwd(tmp_path, monkeypatch, captured_theme):
 def test_plot_picks_up_legacy_file_with_warning(tmp_path, monkeypatch, captured_theme):
     monkeypatch.chdir(tmp_path)
     _write(tmp_path, LEGACY_FILE, OLD_TOML)
-    with pytest.warns(UtilityVizDeprecationWarning, match="econ-viz.toml"):
+    with pytest.warns(UtilityVizDeprecationWarning, match="utility-viz.toml"):
         _plot(monkeypatch, tmp_path)
     assert captured_theme["theme"].ic_color == "#222222"
 
