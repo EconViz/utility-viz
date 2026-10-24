@@ -511,7 +511,7 @@ wheels = [
 
 [[package]]
 name = "econ-viz"
-version = "2.0.0b8"
+version = "2.0.0b9"
 source = { editable = "packages/econ-viz" }
 dependencies = [
     { name = "utility-viz" },
@@ -1282,7 +1282,7 @@ wheels = [
 
 [[package]]
 name = "mosaickit"
-version = "1.0.0rc6"
+version = "1.0.0rc7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "glyphkit" },
@@ -1293,9 +1293,9 @@ dependencies = [
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2f/4d/5215f089057d05a1dc90db98a6150937045b821f89bd6de8f093d484e851/mosaickit-1.0.0rc6.tar.gz", hash = "sha256:b448b3d5b29c45b5917cae99284dfdee49168ba0affe8711737fac88d9eec981", size = 313513, upload-time = "2026-10-23T12:23:47.484Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3d/54/34ef0eedb1fdb39c2c92c93fa45da971df342dda03b02c6821283f76b9ca/mosaickit-1.0.0rc7.tar.gz", hash = "sha256:0cff7e7827a779d115f54a54d9a1ab461b7394d4f67f79cd05ff6e301f6ce3d1", size = 322650, upload-time = "2026-10-24T07:25:17.976Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/eb/60/46c81860b86064dc693fae68b41d361cc966ca91e9e7a485023f3c09e0c1/mosaickit-1.0.0rc6-py3-none-any.whl", hash = "sha256:4582f661206578696e9e351bf4139c6770a3eb6f9cbec1433bd5938878ea66c6", size = 136699, upload-time = "2026-10-23T12:23:45.779Z" },
+    { url = "https://files.pythonhosted.org/packages/23/09/1235abe6ab6916a9275211d69d5d56746b34cacf786da95ac37257924b35/mosaickit-1.0.0rc7-py3-none-any.whl", hash = "sha256:cb4b9584ebb748f24e33517e5e7651700b252afbe925a674e40765d5cea7a790", size = 142157, upload-time = "2026-10-24T07:25:16.481Z" },
 ]
 
 [[package]]
@@ -2331,7 +2331,7 @@ wheels = [
 
 [[package]]
 name = "utility-viz"
-version = "2.0.0b8"
+version = "2.0.0b9"
 source = { editable = "." }
 dependencies = [
     { name = "bezierkit" },
@@ -2379,7 +2379,7 @@ requires-dist = [
     { name = "ipywidgets", marker = "extra == 'interactive'", specifier = ">=8.0.0" },
     { name = "kinetickit", extras = ["raster"], marker = "extra == 'all'", specifier = ">=1.0.0b2,<2.0.0" },
     { name = "kinetickit", extras = ["raster"], marker = "extra == 'animation'", specifier = ">=1.0.0b2,<2.0.0" },
-    { name = "mosaickit", specifier = ">=1.0.0rc6,<2.0.0" },
+    { name = "mosaickit", specifier = ">=1.0.0rc7,<2.0.0" },
     { name = "numpy", specifier = ">=1.24.0" },
     { name = "scipy", specifier = ">=1.13.0,<2.0.0" },
     { name = "sympy", specifier = ">=1.12.0,<2.0.0" },

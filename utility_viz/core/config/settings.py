@@ -32,8 +32,9 @@ from pathlib import Path
 from typing import Any
 
 import mosaickit
-from mosaickit import ConfigurationError, MathFont, TextFonts
+from mosaickit import ConfigurationError, MathFont, TextFonts, label_overrides
 from mosaickit import econ_toml as et
+from mosaickit.label_overrides import FigureLabels
 
 import utility_viz.core.themes as themes
 from utility_viz.core.config.fonts import _OLD_MATH_TOKENS
@@ -79,12 +80,17 @@ class Config:
         Font files that replace the generic fonts; the ones left out keep the defaults.
     math_font : mosaickit.MathFont, optional
         Math font file; without it math is set by Matplotlib.
+    figure_labels : mapping, optional
+        The ``[figure.<stem>.label."<id>"]`` overrides of the file this was read from, as
+        mosaickit parsed them. :meth:`use` makes them the active ones; ``Canvas.save`` and
+        ``Figure.save`` apply them. ``None`` for a Config that was not read from a file.
     """
 
     theme: Theme = themes.default
     font: str | None = None
     fonts: TextFonts | None = None
     math_font: MathFont | None = None
+    figure_labels: FigureLabels | None = dataclasses.field(default=None, compare=False, repr=False)
 
     @classmethod
     def load(cls, path: str | Path | None = None) -> Config:
@@ -127,6 +133,7 @@ class Config:
         """
         try:
             config = SCHEMA.build(data, source=source, base_dir=base_dir)
+            figures = et.figure_labels(data, source=source)  # parsed by mosaickit, not here
         except ConfigurationError as error:
             message = str(error)
             raise InvalidParameterError(
@@ -134,19 +141,28 @@ class Config:
             ) from None
         if not isinstance(config, cls):  # a subclass asked for its own type
             config = cls(**{f.name: getattr(config, f.name) for f in dataclasses.fields(Config)})
-        return config
+        return dataclasses.replace(config, figure_labels=figures)
 
     def use(self) -> Config:
-        """Make this the default for diagrams created from now on; returns *self*."""
+        """Make this the default for diagrams created from now on; returns *self*.
+
+        A Config read from a file also makes that file's ``[figure.<stem>.label."<id>"]``
+        overrides the active ones (replacing any earlier, also when the file has none), so
+        ``save("<stem>.png")`` moves those labels. A Config made directly leaves them alone.
+        """
         global _active
         _active = self
+        if self.figure_labels is not None:
+            label_overrides.activate(self.figure_labels, Config)
         return self
 
     @staticmethod
     def reset() -> None:
-        """Go back to the built-in defaults."""
+        """Go back to the built-in defaults, and drop the label overrides this package activated."""
         global _active
         _active = None
+        if label_overrides.owned_by(Config):
+            label_overrides.activate(None)
 
     @staticmethod
     def active() -> Config:

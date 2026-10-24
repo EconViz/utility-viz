@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v2.0.0b9 (2026-10-24)
+
+### Changes
+
+- Per-figure label overrides from the shared `econ-viz.toml`:
+  `[figure.<stem>.label."<layer id>"]` with `top`, `bottom`, `left`, `right` moves one label of the
+  figure saved as `<stem>.<ext>`. utility-viz does not parse `[figure]`; mosaickit does, and
+  `Canvas.save` / `CanvasGrid.save` apply it. See "Moving one label" in the README.
+- `Config.load(...)`, `Config.discover()` and `Config.from_dict(...)` keep the file's overrides in the
+  new `Config.figure_labels`; `Config.use()` activates them (replacing earlier ones, also when the file
+  has none) and `Config.reset()` drops them. A `Config` built directly leaves them alone.
+- `utility-viz plot --config <file> --output <stem>.<ext>` applies the file's overrides.
+- `Animator.save("<stem>.gif")` renders its frames under the animation's stem, so one
+  `[figure.<stem>...]` table moves the label in every frame (it used to be `frame-NNNNNN`).
+- Requires `mosaickit>=1.0.0rc7`.
+
 ## v2.0.0b8 (2026-10-23)
 
 ### Changes
