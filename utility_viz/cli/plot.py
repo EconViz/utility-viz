@@ -28,7 +28,7 @@ def cmd_plot(args: argparse.Namespace) -> None:
         raise CliConfigError("provide --model <name> or --latex <expr>")
 
     model = build_model(args)
-    font = fonts = math_font = None
+    font = fonts = math_font = config = None
     config_path = args.config
     if not config_path:
         from utility_viz.core.config.settings import find_config_file
@@ -67,7 +67,13 @@ def cmd_plot(args: argparse.Namespace) -> None:
         cvs.add_equilibrium(eq, show_ray=args.show_ray)
 
     if args.output:
-        cvs.save(args.output)
+        try:
+            if config is not None:
+                config.use()  # also activates the file's [figure.<stem>.label."<id>"] overrides for save()
+            cvs.save(args.output)
+        finally:
+            if config is not None:
+                config.reset()
         print(f"Saved to {args.output}")
     else:
         cvs.show()

@@ -303,6 +303,44 @@ over the file. A mistake names the file, the table and, when the name is close,
 what you probably meant (`[utility.stroke] no such setting; did you mean 'budget'?`).
 `mosaickit.econ_toml.use()` loads the file for every installed EconViz package at once.
 
+### Moving one label
+
+To nudge a single label of a saved figure without editing the Python that draws it, name the figure
+by its output file's stem and the label by its layer id in the shared part of `econ-viz.toml`
+(outside `[utility]`; mosaickit reads it, utility-viz does not):
+
+```toml
+[figure.tangency.label."equilibrium.label"]
+top = "12pt"
+right = 8
+```
+
+```python
+Config.load("econ-viz.toml").use()
+canvas.save("tangency.svg")  # equilibrium.label moves 12 pt up and 8 pt right
+```
+
+`top`, `bottom`, `left` and `right` are lengths (points, or `"2mm"`, `"0.5cm"`, `"0.1in"`; no `em`);
+opposite sides combine. The override replaces the label's own nudge (an empty table cancels it), ids
+no layer has are ignored, and quote ids and stems that contain dots. It applies when a config read
+from the file has been activated with `Config.use()` (or `mosaickit.econ_toml.use()`) and the figure
+is written with `Canvas.save`, `Figure.save`, `save_figure`, an `EdgeworthBox` save,
+`utility-viz plot --config ... --output <stem>.<ext>`, or `Animator.save("<stem>.gif")` (every frame).
+`render()` and `show()` never apply it.
+
+To find a label's id, list the layers of the figure:
+
+```python
+[layer.id for layer in canvas.snapshot().layers]
+# ['axes.x', 'axes.y', 'axes.x.label', 'axes.y.label', 'axes.origin.label', 'utility.1', 'utility.2',
+#  'budget', 'equilibrium', 'equilibrium.label', 'equilibrium.drop']
+```
+
+Labels are the `TextLayer`s: `axes.x.label`, `axes.y.label`, `axes.origin.label`, `equilibrium.label`,
+the point labels of other diagrams, and in an `EdgeworthBox` `box.x_a`, `box.x_b`, `box.y_a`,
+`box.y_b`, `box.origin_a`, `box.origin_b`. In the SVG every label sits in an element whose `id` is
+its layer id.
+
 ### Themes
 
 `base` picks one of the shared EconViz themes: `manual` (the greys of the manual and the

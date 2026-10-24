@@ -1,6 +1,6 @@
 [project]
 name = "utility-viz"
-version = "2.0.0b8"
+version = "2.0.0b9"
 description = "A Python toolkit for producing publication-quality microeconomics diagrams."
 readme = "README.md"
 authors = [{ name = "Pin Yue Sung", email = "contact@econ-viz.org" }]
@@ -19,7 +19,7 @@ dependencies = [
     "numpy (>=1.24.0)",
     "scipy (>=1.13.0,<2.0.0)",
     "sympy (>=1.12.0,<2.0.0)",
-    "mosaickit>=1.0.0rc6,<2.0.0",
+    "mosaickit>=1.0.0rc7,<2.0.0",
     "bezierkit>=1.1.0,<2.0.0",
 ]
 

@@ -51,16 +51,17 @@ class Animator:
         export_png_frames = _require_kinetickit()
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
-        export_png_frames(self._render_frames(dpi=dpi), target, fps=fps, loop=loop, disposal=2)
+        export_png_frames(self._render_frames(dpi=dpi, stem=target.stem), target, fps=fps, loop=loop, disposal=2)
 
-    def _render_frames(self, dpi: int) -> Iterator[bytes]:
+    def _render_frames(self, dpi: int, stem: str = "frame") -> Iterator[bytes]:
         with TemporaryDirectory(prefix="utility-viz-animation-") as directory:
             root = Path(directory)
             for index, value in enumerate(self._frames):
                 drawable = self._factory(float(value))
                 canvases = cast("Sequence[Canvas]", getattr(drawable, "canvases", (drawable,)))
                 previous = [canvas.spec for canvas in canvases]
-                target = root / f"frame-{index:06d}.png"
+                # Named after the animation, so [figure.<stem>.label."<id>"] moves labels in every frame.
+                target = root / f"{index:06d}" / f"{stem}.png"
                 try:
                     for canvas in canvases:
                         canvas.spec = canvas.spec.replace(dpi=dpi)
