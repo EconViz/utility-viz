@@ -54,7 +54,7 @@ def _file(tmp_path: Path, text: str = OVERRIDE) -> Path:
 def _origin(svg: str, layer_id: str) -> tuple[float, float]:
     """Where the element with this layer id is drawn (its first translate)."""
     group = svg[svg.index(f'<g id="{layer_id}"') :]
-    x, y = re.search(r"translate\(([-\d.]+) ([-\d.]+)\)", group).groups()  # type: ignore[union-attr]
+    x, y = re.search(r"translate\(([-\d.]+) ([-\d.]+)\)", group).groups()
     return float(x), float(y)
 
 
@@ -201,8 +201,8 @@ class TestEverySavePath:
         starts = [m.start() for m in re.finditer(r'<g id="equilibrium.label"', moved)]
         before = [m.start() for m in re.finditer(r'<g id="equilibrium.label"', plain)]
         for a, b in zip(starts, before, strict=True):
-            ma = re.search(r"translate\(([-\d.]+) ([-\d.]+)\)", moved[a:]).groups()  # type: ignore[union-attr]
-            mb = re.search(r"translate\(([-\d.]+) ([-\d.]+)\)", plain[b:]).groups()  # type: ignore[union-attr]
+            ma = re.search(r"translate\(([-\d.]+) ([-\d.]+)\)", moved[a:]).groups()
+            mb = re.search(r"translate\(([-\d.]+) ([-\d.]+)\)", plain[b:]).groups()
             assert float(ma[1]) - float(mb[1]) == pytest.approx(-12, abs=0.01)
 
     def test_save_figure_helper_applies(self, tmp_path):
